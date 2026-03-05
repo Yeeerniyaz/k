@@ -1,0 +1,80 @@
+// Подключаем PostgreSQL
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Пользователи (Админ, Менеджеры, постоянные B2B клиенты)
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // Хэш пароля
+  role      Role     @default(CLIENT)
+  name      String?
+  phone     String?
+  orders    Order[]  // Связь: один клиент может иметь много заказов
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 2. Портфолио (То, что босс добавляет с телефона, кейсы из Instagram)
+model Portfolio {
+  id          String   @id @default(uuid())
+  title       String   // "Вывеска для GLOBAL DENT"
+  category    ServiceCategory // "BANNERS", "METAL_FRAMES" и т.д.
+  imageUrl    String   // Ссылка на фото
+  description String?
+  isVisible   Boolean  @default(true) // Можно временно скрыть
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 3. Заказы (Падают с калькулятора в CRM)
+model Order {
+  id          String      @id @default(uuid())
+  client      User?       @relation(fields: [clientId], references: [id])
+  clientId    String?     // Может быть null, если заказ от гостя без регистрации
+  customerName String     // Имя заказчика (особенно если без регистрации)
+  phone       String      // Обязательно для связи
+  
+  // Детали с калькулятора
+  serviceType ServiceCategory // Тип услуги
+  width       Float?      // Ширина в метрах (не для всех услуг нужно)
+  height      Float?      // Высота в метрах
+  material    String?     // "Оракал", "Баннер 440г"
+  hasEyelets  Boolean     @default(false) // Люверсы
+  needsMount  Boolean     @default(false) // Нужен монтаж
+  
+  totalPrice  Int         // Итоговая цена в тенге
+  status      OrderStatus @default(NEW)
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Перечисления для строгой типизации
+enum Role {
+  ADMIN
+  MANAGER
+  CLIENT
+}
+
+enum OrderStatus {
+  NEW         // Только упала заявка
+  IN_PROGRESS // В производстве
+  READY       // Ждет отгрузки/монтажа
+  COMPLETED   // Закрыт и оплачен
+}
+
+// Категории услуг (взяты из реального прайса/инсты)
+enum ServiceCategory {
+  BANNERS         // Баннеры, наружная реклама
+  INTERIOR        // Оформление интерьера и экстерьера
+  FIGURES_3D      // Объемные фигуры
+  METAL_FRAMES    // Металлокаркасы
+  DESIGN_PRINT    // Дизайн и печать
+}
