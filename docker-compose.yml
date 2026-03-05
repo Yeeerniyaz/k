@@ -5,15 +5,13 @@ services:
     build: .
     container_name: royal-banners-api
     restart: always
-    # 🔥 НОВОЕ: Явно подключаем .env файл из корня проекта
-    env_file:
-      - .env
+    # 🔥 УБРАЛИ БЛОК env_file, так как Portainer сам держит ключи в памяти
     environment:
       - PORT=5005
       - NODE_ENV=production
       # Подключаемся к нашему "Слону" напрямую по имени контейнера в одной сети
       - DATABASE_URL=postgresql://yeee:Qazplm01@datebase:5432/royal_banners?schema=public
-      # 🔥 НОВОЕ: Пробрасываем секреты для Auth и Cloudinary внутрь контейнера
+      # Вытягиваем секреты из раздела Environment variables в Portainer
       - JWT_SECRET=${JWT_SECRET}
       - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
