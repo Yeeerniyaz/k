@@ -1,6 +1,6 @@
 import { prisma } from '../server.js';
 
-// Твой старый код создания заказа полностью перенесен сюда
+// Экспортируем функцию createOrder
 export const createOrder = async (req, res, next) => {
     try {
         const { customerName, phone, serviceType, width, height, totalPrice } = req.body;
@@ -16,6 +16,7 @@ export const createOrder = async (req, res, next) => {
             data: {
                 customerName,
                 phone,
+                // Важно: serviceType теперь должен строго соответствовать ServiceCategory из schema.prisma
                 serviceType,
                 width,
                 height,
@@ -29,7 +30,6 @@ export const createOrder = async (req, res, next) => {
             data: newOrder
         });
     } catch (error) {
-        // Передаем ошибку в глобальный обработчик (app.js)
         next(error); 
     }
 };

@@ -1,50 +1,12 @@
-import { prisma } from '../server.js';
+import { Router } from 'express';
+import { getPortfolio, addPortfolioItem } from '../controllers/portfolio.controller.js';
 
-// Получить все работы для красивой витрины
-export const getPortfolio = async (req, res, next) => {
-    try {
-        const works = await prisma.portfolio.findMany({
-            where: { isVisible: true }, // Отдаем только те, что разрешено показывать
-            orderBy: { createdAt: 'desc' } // Свежие работы сверху
-        });
+const router = Router();
 
-        res.status(200).json({
-            status: 'success',
-            results: works.length,
-            data: works
-        });
-    } catch (error) {
-        next(error);
-    }
-};
+// GET /api/portfolio - Получить все работы для красивой витрины
+router.get('/', getPortfolio);
 
-// Добавить новую работу (вызовешь это из админки)
-export const addPortfolioItem = async (req, res, next) => {
-    try {
-        const { title, category, imageUrl, description } = req.body;
+// POST /api/portfolio - Добавить новую работу (вызовешь это из админки)
+router.post('/', addPortfolioItem);
 
-        if (!title || !category || !imageUrl) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Название, категория и ссылка на картинку обязательны'
-            });
-        }
-
-        const newItem = await prisma.portfolio.create({
-            data: {
-                title,
-                category,
-                imageUrl,
-                description
-            }
-        });
-
-        res.status(201).json({
-            status: 'success',
-            message: 'Работа успешно добавлена в портфолио',
-            data: newItem
-        });
-    } catch (error) {
-        next(error);
-    }
-};
+export default router;

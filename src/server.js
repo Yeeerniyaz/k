@@ -1,11 +1,19 @@
 import app from './app.js';
 import dotenv from 'dotenv';
+// 🔥 Импорты для Prisma 7
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 
 dotenv.config();
 
-// Экспортируем prisma для использования в контроллерах
-export const prisma = new PrismaClient();
+// --- Инициализация БД для Prisma 7 ---
+const { Pool } = pg;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+
+// Передаем адаптер в конструктор
+export const prisma = new PrismaClient({ adapter });
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
@@ -21,7 +29,7 @@ const startServer = async () => {
             console.log(`======================================\n`);
         });
 
-        // Твой старый Graceful shutdown - сохранен и улучшен
+        // Graceful shutdown - плавное отключение
         process.on('SIGINT', async () => {
             await prisma.$disconnect();
             server.close(() => {

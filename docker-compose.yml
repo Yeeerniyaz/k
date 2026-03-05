@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  royal-banners-api:
+    build: .
+    container_name: royal-banners-api
+    restart: always
+    environment:
+      - PORT=5005
+      - NODE_ENV=production
+      # Подключаемся к нашему "Слону" напрямую по имени контейнера в одной сети
+      - DATABASE_URL=postgresql://yeee:Qazplm01@datebase:5432/royal_banners?schema=public
+    ports:
+      - "5005:5005"
+    networks:
+      - shared_db_network
+
+# Подключаемся к существующей сети универсальной базы данных
+networks:
+  shared_db_network:
+    external: true
+    name: universal_db_network
