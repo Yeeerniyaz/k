@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { getPortfolio, addPortfolioItem } from '../controllers/portfolio.controller.js';
-// 🔥 НОВЫЙ ИМПОРТ: Подключаем охранников нашего API
 import { protect, restrictTo } from '../middlewares/auth.middleware.js';
+
+// 🔥 НОВЫЙ ИМПОРТ: Подключаем наш перехватчик файлов (Multer)
+import { uploadPhoto } from '../middlewares/upload.middleware.js';
 
 const router = Router();
 
@@ -15,9 +17,19 @@ const router = Router();
 router.get('/', getPortfolio);
 
 // Маршрут: POST /api/portfolio
-// Описание: Добавить новую работу (вызовешь это из админки)
+// Описание: Добавить новую работу (с поддержкой загрузки реальных фото)
 // Доступ: ЗАЩИЩЕННЫЙ (Только авторизованные пользователи с ролью ADMIN или MANAGER)
-// Как это работает: Сначала protect проверяет токен, затем restrictTo проверяет права, и только потом срабатывает addPortfolioItem
-router.post('/', protect, restrictTo('ADMIN', 'MANAGER'), addPortfolioItem);
+// Как это работает:
+// 1. protect -> проверяет токен
+// 2. restrictTo -> проверяет права админа
+// 3. uploadPhoto.single('image') -> ловит файл с ключом 'image' и кладет его в оперативную память (req.file)
+// 4. addPortfolioItem -> сохраняет данные в базу и отправляет фото в Cloudinary
+router.post(
+    '/',
+    protect,
+    restrictTo('ADMIN', 'MANAGER'),
+    uploadPhoto.single('image'), // Внедряем обработку файла
+    addPortfolioItem
+);
 
 export default router;

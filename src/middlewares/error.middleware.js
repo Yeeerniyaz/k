@@ -8,7 +8,10 @@ import orderRoutes from './routes/order.routes.js';
 import portfolioRoutes from './routes/portfolio.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
-import analyticsRoutes from './routes/analytics.routes.js'; // 🔥 НОВЫЙ ИМПОРТ: Маршруты аналитики
+import analyticsRoutes from './routes/analytics.routes.js';
+
+// 🔥 НОВЫЙ ИМПОРТ: Наш умный перехватчик ошибок
+import { errorHandler } from './middlewares/error.middleware.js';
 
 const app = express();
 
@@ -39,7 +42,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/analytics', analyticsRoutes); // 🔥 НОВОЕ ПОДКЛЮЧЕНИЕ: Дашборд теперь доступен по /api/analytics/dashboard
+app.use('/api/analytics', analyticsRoutes);
 
 // ==========================================
 // 4. ОБРАБОТЧИК НЕСУЩЕСТВУЮЩИХ МАРШРУТОВ (404)
@@ -52,15 +55,9 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 5. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК (500)
+// 5. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК (ENTERPRISE GRADE)
 // ==========================================
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({
-        status: 'error',
-        message: 'Что-то пошло не так на сервере!',
-        error: process.env.NODE_ENV === 'development' ? err.message : {}
-    });
-});
+// 🔥 НОВЫЙ КОД: Передаем управление нашему error.middleware.js
+app.use(errorHandler);
 
 export default app;
