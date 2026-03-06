@@ -68,7 +68,7 @@ app.use(express.static(clientBuildPath));
 
 // Кез келген басқа сұранысқа (API-ге жатпайтын) index.html-ді қайтарамыз.
 // Бұл React Router-дің браузерде дұрыс жұмыс істеуі үшін қажет.
-app.get('*', (req, res) => {
+app.get('*path', (req, res) => {
     // Егер сұраныс /api-мен басталса, бірақ ол маршрут табылмаса - бұл 404
     if (req.url.startsWith('/api')) {
         return res.status(404).json({ status: 'error', message: 'API эндпоинт не найден' });
