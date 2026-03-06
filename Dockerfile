@@ -1,31 +1,19 @@
-# ==========================================
-# ЛЕГКИЙ ОБРАЗ БЭКЕНДА (PRODUCTION)
-# ==========================================
+# Тек іске қосуға арналған жеңіл образ
 FROM node:22-slim
 
-
-# Устанавливаем OpenSSL (критически важно для движка Prisma)
+# OpenSSL міндетті түрде керек (Prisma үшін)
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Шаг 1: Копируем только файлы зависимостей бэкенда
-COPY package*.json ./
-COPY prisma ./prisma/
-
-# Шаг 2: Устанавливаем зависимости и генерируем Prisma 
-# (Это съест минимум ресурсов сервера)
-RUN npm install
-RUN npx prisma generate
-
-# Шаг 3: Включаем production режим
-ENV NODE_ENV=production
-
-# Шаг 4: Копируем весь исходный код бэкенда и УЖЕ СОБРАННЫЙ фронтенд (client/dist)
+# Ноутта жиналған барлық файлдарды (node_modules, client/dist, prisma) көшіру
+# Маңызды: Ноутың мен сервердің ОС бірдей болуы керек (мысалы, Linux/Docker Desktop)
 COPY . .
 
-# Сообщаем, что контейнер будет слушать 5005 порт
+# Продакшн режим
+ENV NODE_ENV=production
+
 EXPOSE 5005
 
-# Запускаем сервер
+# Бірден іске қосамыз
 CMD ["npm", "start"]
