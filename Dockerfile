@@ -18,21 +18,21 @@ RUN npm run build
 # ==========================================
 FROM node:22-slim
 
-# Устанавливаем OpenSSL (критично для движка Prisma)
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+# Устанавливаем OpenSSL и сертификаты (критично для движка Prisma)
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 1. Копируем конфиги бэкенда
+# 1. Копируем конфиги бэкенда и схему БД
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# 2. Устанавливаем ВСЕ зависимости (включая devDependencies для Prisma CLI)
-# Мы НЕ ставим NODE_ENV=production здесь
+# 2. Устанавливаем ВСЕ зависимости
+# (NODE_ENV=production еще НЕ установлен, поэтому prisma установится из devDependencies)
 RUN npm install
 
 # 3. Генерируем клиент Prisma
-# Теперь памяти (Swap) и пакетов точно хватит
+# Теперь памяти (Swap) и пакетов хватит на 100%
 RUN npx prisma generate
 
 # 4. Копируем исходный код бэкенда
@@ -41,9 +41,10 @@ COPY . .
 # 5. Копируем собранный фронтенд из первого этапа
 COPY --from=frontend-builder /build/client/dist ./client/dist
 
-# 6. ТОЛЬКО СЕЙЧАС включаем продакшн режим для работы сервера
+# 6. ТОЛЬКО СЕЙЧАС включаем продакшн режим
 ENV NODE_ENV=production
 
+# Сообщаем порт
 EXPOSE 5005
 
 # Запуск сервера
