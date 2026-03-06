@@ -23,8 +23,8 @@ const theme = createTheme({
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {/* Оборачиваем всё в Mantine и принудительно ставим темную тему (Dark Mode) */}
-    <MantineProvider theme={theme} defaultColorScheme="dark">
+    {/* Оборачиваем всё в Mantine и принудительно ставим светлую тему (Light Mode) */}
+    <MantineProvider theme={theme} defaultColorScheme="light" withGlobalStyles withNormalizeCSS>
       {/* Подключаем маршрутизатор для навигации по страницам */}
       <BrowserRouter>
         <App />
