@@ -1,12 +1,21 @@
+// 🔥 СЕНЬОРСКАЯ ПРАКТИКА: Импортируем наш класс ошибок, чтобы middleware знал о его структуре
+import { AppError } from '../utils/AppError.js';
+
 // ==========================================
 // ГЛОБАЛЬНЫЙ ПЕРЕХВАТЧИК ОШИБОК (ENTERPRISE GRADE)
 // ==========================================
 
 export const errorHandler = (err, req, res, next) => {
-    // Логируем ошибку на сервере для дебага
+    // Логируем ошибку на сервере для дебага (чтобы Ернияз видел, что упало)
     console.error('💥 [ERROR CAUGHT]:', err.name, '|', err.message);
 
-    // Базовые значения
+    // Копируем объект ошибки, чтобы не мутировать оригинальный (Best Practice)
+    let error = { ...err };
+    error.message = err.message;
+    error.name = err.name;
+    error.code = err.code;
+
+    // Базовые значения, которые приходят из AppError или берутся по умолчанию
     let statusCode = err.statusCode || 500;
     let message = err.message || 'Внутренняя ошибка сервера';
     let status = err.status || 'error';
@@ -14,18 +23,18 @@ export const errorHandler = (err, req, res, next) => {
     // --------------------------------------------------------
     // 1. ОБРАБОТКА ОШИБОК БАЗЫ ДАННЫХ (PRISMA)
     // --------------------------------------------------------
-    if (err.code === 'P2002') {
+    if (error.code === 'P2002') {
         statusCode = 409; // Conflict
-        const target = err.meta?.target || 'данными';
+        const target = error.meta?.target || 'данными';
         message = `Пользователь или запись с такими ${target} уже существует.`;
     }
     
-    if (err.code === 'P2025') {
+    if (error.code === 'P2025') {
         statusCode = 404; // Not Found
         message = 'Запрашиваемая запись не найдена в базе данных.';
     }
 
-    if (err.code === 'P2003') {
+    if (error.code === 'P2003') {
         statusCode = 400; // Bad Request
         message = 'Ошибка целостности данных. Проверьте связанные поля.';
     }
@@ -33,12 +42,12 @@ export const errorHandler = (err, req, res, next) => {
     // --------------------------------------------------------
     // 2. ОБРАБОТКА ОШИБОК АВТОРИЗАЦИИ (JWT)
     // --------------------------------------------------------
-    if (err.name === 'JsonWebTokenError') {
+    if (error.name === 'JsonWebTokenError') {
         statusCode = 401; // Unauthorized
         message = 'Недействительный токен доступа. Пожалуйста, авторизуйтесь заново.';
     }
 
-    if (err.name === 'TokenExpiredError') {
+    if (error.name === 'TokenExpiredError') {
         statusCode = 401; // Unauthorized
         message = 'Время жизни сессии истекло. Пожалуйста, войдите в систему снова.';
     }
@@ -46,13 +55,23 @@ export const errorHandler = (err, req, res, next) => {
     // --------------------------------------------------------
     // 3. ОБРАБОТКА ОШИБОК ЗАГРУЗКИ ФАЙЛОВ (MULTER)
     // --------------------------------------------------------
-    if (err.name === 'MulterError') {
+    if (error.name === 'MulterError') {
         statusCode = 400; // Bad Request
-        if (err.code === 'LIMIT_FILE_SIZE') {
+        if (error.code === 'LIMIT_FILE_SIZE') {
             message = 'Файл слишком большой. Максимальный размер - 10 МБ.';
         } else {
-            message = `Ошибка загрузки файла: ${err.message}`;
+            message = `Ошибка загрузки файла: ${error.message}`;
         }
+    }
+
+    // --------------------------------------------------------
+    // 4. ЗАЩИТА ОТ УТЕЧЕКИ ДАННЫХ В PRODUCTION
+    // --------------------------------------------------------
+    // Если мы в продакшене, ошибка имеет статус 500, и это НЕ наша AppError (isOperational = false),
+    // значит это неизвестный баг (например, отвалилась БД). 
+    // Мы скрываем детали, чтобы хакеры не узнали структуру БД.
+    if (process.env.NODE_ENV === 'production' && !err.isOperational && statusCode === 500) {
+        message = 'Что-то пошло не так на сервере. Мы уже работаем над устранением проблемы.';
     }
 
     // --------------------------------------------------------
@@ -61,7 +80,7 @@ export const errorHandler = (err, req, res, next) => {
     res.status(statusCode).json({
         status,
         message,
-        // Стек-трейс отдаем ТОЛЬКО в режиме разработки
+        // Стек-трейс (где именно в коде упало) отдаем ТОЛЬКО в режиме разработки
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 };

@@ -1,18 +1,40 @@
 import { Router } from 'express';
-import { register, login } from '../controllers/auth.controller.js';
+import { register, login, getMe, logout } from '../controllers/auth.controller.js';
+
+// 🔥 СЕНЬОРСКАЯ ПРАКТИКА: Импортируем middleware для защиты приватных маршрутов
+import { protect, authorize } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
 // ==========================================
-// МАРШРУТЫ АУТЕНТИФИКАЦИИ (POST /api/auth)
+// 1. ПУБЛИЧНЫЕ МАРШРУТЫ (НЕ ТРЕБУЮТ ТОКЕНА)
 // ==========================================
-
-// Маршрут: POST /api/auth/register
-// Описание: Создание нового пользователя (Админ, Менеджер или Клиент)
-router.post('/register', register);
 
 // Маршрут: POST /api/auth/login
 // Описание: Вход в систему и получение JWT токена
 router.post('/login', login);
+
+// ==========================================
+// 2. ЗАЩИЩЕННЫЕ МАРШРУТЫ (ТРЕБУЮТ ТОКЕН)
+// ==========================================
+
+// Маршрут: GET /api/auth/me
+// Описание: Получение профиля текущего пользователя (React запрашивает это при каждом обновлении страницы)
+// Защита: Только авторизованные пользователи
+router.get('/me', protect, getMe);
+
+// Маршрут: POST /api/auth/logout
+// Описание: Выход из системы (уничтожение сессии на клиенте)
+// Защита: Только авторизованные пользователи
+router.post('/logout', protect, logout);
+
+// ==========================================
+// 3. АДМИНИСТРАТИВНЫЕ МАРШРУТЫ (ТРЕБУЮТ РОЛЬ ADMIN)
+// ==========================================
+
+// Маршрут: POST /api/auth/register
+// Описание: Создание нового пользователя (Админ или Менеджер)
+// Защита: 🔥 Только главный администратор имеет право создавать новых сотрудников!
+router.post('/register', protect, authorize('ADMIN'), register);
 
 export default router;

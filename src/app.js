@@ -12,8 +12,10 @@ import orderRoutes from './routes/order.routes.js';
 import priceRoutes from './routes/price.routes.js';
 import portfolioRoutes from './routes/portfolio.routes.js';
 import financeRoutes from './routes/finance.routes.js';
-// 🔥 ДОБАВЛЕНО: Маршрут для аналитики (Dashboard)
 import analyticsRoutes from './routes/analytics.routes.js';
+
+// 🔥 СЕНЬОРСКОЕ ДОБАВЛЕНИЕ: Импортируем наш глобальный перехватчик ошибок
+import { errorHandler } from './middlewares/error.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,7 +65,6 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/prices', priceRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/finance', financeRoutes);
-// 🔥 ДОБАВЛЕНО: Подключение аналитики
 app.use('/api/analytics', analyticsRoutes);
 
 // ==========================================
@@ -85,24 +86,16 @@ app.get('*path', (req, res, next) => {
 // ==========================================
 
 // Ошибка 404 (Для неверных API маршрутов)
-app.use((req, res) => {
-    res.status(404).json({
-        status: 'error',
-        message: `Маршрут ${req.originalUrl} не найден на этом сервере.`
-    });
+app.use((req, res, next) => {
+    // Формируем ошибку и передаем её в глобальный обработчик
+    const err = new Error(`Маршрут ${req.originalUrl} не найден на этом сервере.`);
+    err.status = 'error';
+    err.statusCode = 404;
+    next(err);
 });
 
-// Глобальный перехватчик ошибок
-app.use((err, req, res, next) => {
-    err.statusCode = err.statusCode || 500;
-
-    console.error('🔥 SERVER ERROR:', err);
-
-    res.status(err.statusCode).json({
-        status: 'error',
-        message: err.message || 'Внутренняя ошибка сервера',
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
-});
+// 🔥 СЕНЬОРСКАЯ ПРАКТИКА: Подключаем централизованный обработчик ошибок
+// Теперь все ошибки из контроллеров (пойманные через catchAsync) стекаются сюда
+app.use(errorHandler);
 
 export default app;

@@ -1,12 +1,26 @@
 import { v2 as cloudinary } from 'cloudinary';
 import streamifier from 'streamifier';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+// 🔥 СЕНЬОРСКАЯ ПРАКТИКА: Интегрируем нашу единую систему ошибок
+import { AppError } from '../utils/AppError.js';
+
+// Гарантируем правильную загрузку переменных окружения
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // ==========================================
-// 1. КОНФИГУРАЦИЯ CLOUDINARY
+// 1. КОНФИГУРАЦИЯ CLOUDINARY (С ПРОВЕРКОЙ)
 // ==========================================
+
+// Fail-Fast подход: предупреждаем заранее, если ключей нет
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    console.warn('⚠️  ВНИМАНИЕ: Ключи Cloudinary не найдены в .env. Загрузка фото работать не будет!');
+}
+
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -30,10 +44,11 @@ export const uploadImage = (imageBuffer, folderName = 'royal_banners_portfolio')
             },
             (error, result) => {
                 if (error) {
-                    console.error('💥 Ошибка загрузки в Cloudinary:', error);
-                    return reject(error);
+                    console.error('💥 Ошибка Cloudinary (Upload):', error);
+                    // Вместо сырой ошибки бросаем AppError, чтобы error.middleware.js его корректно обработал
+                    return reject(new AppError('Не удалось загрузить изображение в облако. Проверьте настройки Cloudinary.', 500));
                 }
-                resolve(result); // Возвращаем результат (там будет лежать url картинки)
+                resolve(result); // Возвращаем результат (там будет лежать secure_url картинки)
             }
         );
 
@@ -50,7 +65,8 @@ export const deleteImage = async (publicId) => {
         const result = await cloudinary.uploader.destroy(publicId);
         return result;
     } catch (error) {
-        console.error('💥 Ошибка удаления из Cloudinary:', error);
-        throw error;
+        console.error('💥 Ошибка Cloudinary (Delete):', error);
+        // Бросаем AppError для единообразия
+        throw new AppError('Не удалось удалить изображение из облака.', 500);
     }
 };
