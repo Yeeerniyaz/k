@@ -7,6 +7,8 @@ import {
   NavLink,
   Button,
   Text,
+  Center,
+  Image,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -17,10 +19,8 @@ import {
   IconLogout,
 } from "@tabler/icons-react";
 
-// ==========================================
-// 1. ЗАГЛУШКИ ДЛЯ СТРАНИЦ
-// (Позже каждую из них мы вынесем в отдельный красивый файл)
-// ==========================================
+import Login from "./pages/Login.jsx";
+
 const Dashboard = () => (
   <div>
     <Title order={2}>Аналитика и Дашборд</Title>
@@ -45,24 +45,18 @@ const Users = () => (
     <Text mt="sm">Управление доступом менеджеров...</Text>
   </div>
 );
-const Login = () => (
-  <div>
-    <Title order={2}>Авторизация</Title>
-    <Text mt="sm">Скоро здесь будет форма входа...</Text>
-  </div>
-);
 
 export default function App() {
-  // Хук для управления состоянием мобильного меню (бургер)
   const [opened, { toggle }] = useDisclosure();
   const navigate = useNavigate();
 
-  // ==========================================
-  // 2. БАЗОВАЯ ПРОВЕРКА АВТОРИЗАЦИИ
-  // Пока мы жестко задаем false, чтобы видеть только страницу логина.
-  // Позже мы заменим это на проверку JWT-токена из localStorage или Zustand.
-  // ==========================================
-  const isAuthenticated = false;
+  const token = localStorage.getItem("royal_token");
+  const isAuthenticated = !!token;
+
+  const handleLogout = () => {
+    localStorage.removeItem("royal_token");
+    window.location.href = "/login";
+  };
 
   return (
     <AppShell
@@ -70,35 +64,61 @@ export default function App() {
       navbar={{
         width: 250,
         breakpoint: "sm",
-        // Боковое меню скрыто на мобилках, пока не нажмут на бургер
         collapsed: { mobile: !opened },
       }}
       padding="md"
     >
-      {/* ========================================== */}
-      {/* ХЕДЕР (ВЕРХНЯЯ ПАНЕЛЬ) */}
-      {/* ========================================== */}
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
-          <Group>
-            {/* Кнопка-бургер появляется только на мобильных экранах */}
+          <Group gap="sm">
             <Burger
               opened={opened}
               onClick={toggle}
               hiddenFrom="sm"
               size="sm"
             />
-            <Title order={3} c="orange">
-              Royal Banners
-            </Title>
+
+            {/* 🔥 КОНТЕЙНЕР ДЛЯ ЛОГОТИПА */}
+            <Group
+              gap="sm"
+              style={{ cursor: "pointer" }}
+              onClick={() => navigate("/")}
+            >
+              {/* Квадрат с твоим цветом и скруглением */}
+              <Center
+                bg="#1B2E3D"
+                w={40}
+                h={40}
+                style={{ borderRadius: "8px" }}
+              >
+                {/* ВАЖНО: Если твой конь в SVG темный, добавь ему fill="#ffffff" прямо в файле logo.svg, 
+                  чтобы он был белым на темном фоне контейнера!
+                */}
+                <Image src="/src/assets/logo.svg" w={24} h={24} fit="contain" />
+              </Center>
+
+              {/* Текст шрифтом Alyamama. visibleFrom="sm" прячет его на телефонах! */}
+              <Title
+                order={3}
+                visibleFrom="sm"
+                style={{
+                  fontFamily: '"Alyamama", sans-serif',
+                  color: "#1B2E3D",
+                  letterSpacing: "1px",
+                  fontWeight: 700,
+                }}
+              >
+                ROYAL BANNERS
+              </Title>
+            </Group>
           </Group>
 
-          {/* Кнопка выхода отображается только если пользователь авторизован */}
           {isAuthenticated && (
             <Button
               variant="light"
               color="red"
               leftSection={<IconLogout size={16} />}
+              onClick={handleLogout}
             >
               Выйти
             </Button>
@@ -106,10 +126,6 @@ export default function App() {
         </Group>
       </AppShell.Header>
 
-      {/* ========================================== */}
-      {/* САЙДБАР (БОКОВОЕ МЕНЮ) */}
-      {/* ========================================== */}
-      {/* Рендерим меню только если админ вошел в систему */}
       {isAuthenticated && (
         <AppShell.Navbar p="md">
           <NavLink
@@ -147,26 +163,19 @@ export default function App() {
         </AppShell.Navbar>
       )}
 
-      {/* ========================================== */}
-      {/* ГЛАВНАЯ ЗОНА (КОНТЕНТ СТРАНИЦ) */}
-      {/* ========================================== */}
       <AppShell.Main>
         <Routes>
-          {/* Сценарий 1: Гость (не авторизован) */}
           {!isAuthenticated ? (
             <>
               <Route path="/login" element={<Login />} />
-              {/* Любой другой URL перекидывает на логин */}
               <Route path="*" element={<Navigate to="/login" replace />} />
             </>
           ) : (
-            /* Сценарий 2: Админ (авторизован) */
             <>
               <Route path="/" element={<Dashboard />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/users" element={<Users />} />
-              {/* Любой неизвестный URL перекидывает на главную */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}

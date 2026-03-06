@@ -4,28 +4,34 @@ import { BrowserRouter } from 'react-router-dom';
 import { MantineProvider, createTheme } from '@mantine/core';
 import App from './App.jsx';
 
-// 🔥 ОБЯЗАТЕЛЬНО: Подключаем базовые стили Mantine
 import '@mantine/core/styles.css';
-// Твои глобальные стили (если нужны)
 import './index.css';
 
 // ==========================================
 // ГЛОБАЛЬНАЯ ТЕМА ПРИЛОЖЕНИЯ (ENTERPRISE UI)
 // ==========================================
 const theme = createTheme({
-  // Устанавливаем фирменный оранжевый акцент
-  primaryColor: 'orange',
-  // Выбираем насыщенность цвета (от 0 до 9)
-  primaryShade: 6,
-  // Базовый шрифт для чистого и современного вида
-  fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+  // 1. Создаем кастомную палитру для твоего цвета #1B2E3D
+  colors: {
+    royalBlue: [
+      '#ebf1f6', '#d3e1ec', '#a2c1d9', '#6d9fc5', '#4281b3',
+      '#266ea8', '#1663a2', '#06538f', '#1B2E3D', '#003a68' // Индекс 8 - твой цвет
+    ],
+  },
+  // 2. Устанавливаем его как главный цвет приложения
+  primaryColor: 'royalBlue',
+  primaryShade: 8,
+  
+  // 3. Устанавливаем Google Sans для всего приложения
+  fontFamily: '"Google Sans", sans-serif',
+  headings: {
+    fontFamily: '"Google Sans", sans-serif',
+  },
 });
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {/* Оборачиваем всё в Mantine и принудительно ставим светлую тему (Light Mode) */}
-    <MantineProvider theme={theme} defaultColorScheme="light" withGlobalStyles withNormalizeCSS>
-      {/* Подключаем маршрутизатор для навигации по страницам */}
+    <MantineProvider theme={theme} defaultColorScheme="light">
       <BrowserRouter>
         <App />
       </BrowserRouter>

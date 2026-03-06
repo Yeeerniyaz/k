@@ -52,10 +52,10 @@ export default function Login() {
 
   return (
     <Container size={420} my={80}>
-      <Center mb="lg">
+      <Center mb="lg" bg="gray">
         {/* Выводим твоего коня. Vite сам найдет его в папке public/assets/ */}
         <Image
-          src="/assets/logo.svg"
+          src="/src/assets/logo.svg"
           alt="Royal Banners Logo"
           w={100}
           fit="contain"
