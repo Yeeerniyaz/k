@@ -1,35 +1,45 @@
-import { Router } from 'express';
-import { getPortfolio, addPortfolioItem } from '../controllers/portfolio.controller.js';
-import { protect, restrictTo } from '../middlewares/auth.middleware.js';
+import express from 'express';
+import {
+    getPortfolio,
+    addPortfolioItem,
+    updatePortfolioItem,
+    deletePortfolioItem
+} from '../controllers/portfolio.controller.js';
 
-// 🔥 НОВЫЙ ИМПОРТ: Подключаем наш перехватчик файлов (Multer)
-import { uploadPhoto } from '../middlewares/upload.middleware.js';
+// Импортируем наши сеньорские middleware
+import { protect, authorize } from '../middlewares/auth.middleware.js';
 
-const router = Router();
+// Импортируем middleware для загрузки файлов (Multer)
+// Ожидается, что у тебя есть файл upload.middleware.js, который обрабатывает form-data
+import upload from '../middlewares/upload.middleware.js';
+
+const router = express.Router();
 
 // ==========================================
-// МАРШРУТЫ ПОРТФОЛИО (API ENDPOINTS: /api/portfolio)
+// 1. ПУБЛИЧНЫЕ МАРШРУТЫ (ОТКРЫТЫ ДЛЯ ВСЕХ)
 // ==========================================
-
-// Маршрут: GET /api/portfolio
-// Описание: Получить все работы для красивой витрины
-// Доступ: ПУБЛИЧНЫЙ (Любой посетитель сайта может видеть портфолио)
+// Получение всех работ портфолио для витрины (Home.jsx и PublicPortfolio.jsx)
 router.get('/', getPortfolio);
 
-// Маршрут: POST /api/portfolio
-// Описание: Добавить новую работу (с поддержкой загрузки реальных фото)
-// Доступ: ЗАЩИЩЕННЫЙ (Только авторизованные пользователи с ролью ADMIN или MANAGER)
-// Как это работает:
-// 1. protect -> проверяет токен
-// 2. restrictTo -> проверяет права админа
-// 3. uploadPhoto.single('image') -> ловит файл с ключом 'image' и кладет его в оперативную память (req.file)
-// 4. addPortfolioItem -> сохраняет данные в базу и отправляет фото в Cloudinary
-router.post(
-    '/',
-    protect,
-    restrictTo('ADMIN', 'MANAGER'),
-    uploadPhoto.single('image'), // Внедряем обработку файла
-    addPortfolioItem
-);
+// ==========================================
+// 2. ЗАЩИЩЕННЫЕ МАРШРУТЫ (ДЛЯ АДМИНКИ)
+// ==========================================
+// Все запросы ниже этой строки обязаны иметь валидный JWT токен
+router.use(protect);
+
+// Добавление новой работы в портфолио.
+// 🔥 Смарт-цепочка: Сначала Multer ловит файл (upload.single('image')), затем срабатывает контроллер.
+router.post('/', upload.single('image'), addPortfolioItem);
+
+// ==========================================
+// 3. ОПЕРАЦИИ С КОНКРЕТНОЙ РАБОТОЙ
+// ==========================================
+router.route('/:id')
+    // Обновление информации о работе (название, категория, описание, видимость)
+    .put(updatePortfolioItem)
+    
+    // Удаление работы из портфолио
+    // 🔥 СЕНЬОРСКАЯ ФИЧА: Только администратор имеет право удалять работы
+    .delete(authorize('ADMIN'), deletePortfolioItem);
 
 export default router;

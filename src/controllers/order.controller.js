@@ -1,93 +1,112 @@
-import { prisma } from '../server.js';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 // ==========================================
-// 1. СОЗДАНИЕ ЗАКАЗА (ДЛЯ КЛИЕНТОВ НА САЙТЕ)
+// 1. ПОЛУЧЕНИЕ ВСЕХ ЗАКАЗОВ (С РАСХОДАМИ)
 // ==========================================
-// Твой старый код создания заказа полностью сохранен
-export const createOrder = async (req, res, next) => {
-    try {
-        const { customerName, phone, serviceType, width, height, totalPrice } = req.body;
-
-        if (!customerName || !phone || !serviceType || !totalPrice) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Не заполнены обязательные поля (имя, телефон, тип услуги, цена)'
-            });
-        }
-
-        const newOrder = await prisma.order.create({
-            data: {
-                customerName,
-                phone,
-                // Важно: serviceType должен строго соответствовать ServiceCategory из schema.prisma
-                serviceType,
-                width,
-                height,
-                totalPrice,
-            }
-        });
-
-        res.status(201).json({
-            status: 'success',
-            message: 'Заказ успешно создан',
-            data: newOrder
-        });
-    } catch (error) {
-        next(error); 
-    }
-};
-
-// ==========================================
-// 2. ПОЛУЧЕНИЕ ВСЕХ ЗАКАЗОВ (ДЛЯ ERP / АДМИНКИ)
-// ==========================================
-// НОВЫЙ КОД: Позволяет менеджерам видеть всю базу клиентов
-export const getAllOrders = async (req, res, next) => {
+export const getOrders = async (req, res, next) => {
     try {
         const orders = await prisma.order.findMany({
-            orderBy: {
-                createdAt: 'desc' // Самые свежие заявки всегда сверху
+            orderBy: { createdAt: 'desc' },
+            include: {
+                expenses: true, // 🔥 Обязательно подтягиваем расходы (себестоимость) для фронтенда
+                client: true    // Подтягиваем данные зарегистрированного B2B клиента, если есть
             }
         });
 
-        res.status(200).json({
-            status: 'success',
-            results: orders.length,
-            data: orders
-        });
+        // Адаптируем данные под интерфейс фронтенда (маппинг полей)
+        const formattedOrders = orders.map(order => ({
+            ...order,
+            clientName: order.customerName,
+            clientPhone: order.phone,
+            price: order.totalPrice
+        }));
+
+        res.status(200).json({ success: true, data: formattedOrders });
     } catch (error) {
         next(error);
     }
 };
 
 // ==========================================
-// 3. ОБНОВЛЕНИЕ СТАТУСА ЗАКАЗА (ДЛЯ ERP / АДМИНКИ)
+// 2. СОЗДАНИЕ НОВОГО ЗАКАЗА (ЛИДЫ С САЙТА)
 // ==========================================
-// НОВЫЙ КОД: Позволяет двигать заказ по воронке (NEW -> IN_PROGRESS -> COMPLETED)
-export const updateOrderStatus = async (req, res, next) => {
+export const createOrder = async (req, res, next) => {
     try {
-        const { id } = req.params; // Получаем ID заказа из URL (например: /api/orders/123)
-        const { status } = req.body; // Получаем новый статус из тела запроса
+        const { clientName, clientPhone, description, price, status, serviceType } = req.body;
 
-        if (!status) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Необходимо передать новый статус заказа'
-            });
+        const newOrder = await prisma.order.create({
+            data: {
+                customerName: clientName || 'Неизвестный лид',
+                phone: clientPhone || 'Не указан',
+                description: description || '',
+                totalPrice: price ? parseInt(price) : 0,
+                status: status || 'NEW',
+                serviceType: serviceType || 'BANNERS', // Дефолтное значение Enum, если фронт не передал
+            }
+        });
+
+        res.status(201).json({ success: true, data: newOrder, message: 'Заказ успешно создан' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ==========================================
+// 3. ОБНОВЛЕНИЕ ЗАКАЗА (СТАТУС, ЦЕНА, РАСХОДЫ)
+// ==========================================
+export const updateOrder = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { status, price, expenses } = req.body;
+
+        // Формируем базовый объект обновления
+        const updateData = {};
+        if (status) updateData.status = status;
+        if (price !== undefined) updateData.totalPrice = parseInt(price);
+
+        // 🔥 Смарт-обновление расходов (Expenses)
+        // Если фронтенд прислал массив расходов, мы используем транзакционный подход Prisma:
+        // Удаляем старые расходы этого заказа и записываем новые (чтобы избежать дублей)
+        if (expenses && Array.isArray(expenses)) {
+            updateData.expenses = {
+                deleteMany: {}, // Очищаем старые привязанные расходы
+                create: expenses.map(exp => ({
+                    category: exp.category || 'Прочее',
+                    amount: parseInt(exp.amount) || 0,
+                    comment: exp.comment || 'Без комментария',
+                    date: exp.date ? new Date(exp.date) : new Date()
+                }))
+            };
         }
 
-        // Обновляем запись в базе данных
         const updatedOrder = await prisma.order.update({
             where: { id },
-            data: { status } // Должно совпадать с OrderStatus (NEW, IN_PROGRESS, READY, COMPLETED)
+            data: updateData,
+            include: { expenses: true } // Возвращаем обновленный заказ вместе с расходами
         });
 
-        res.status(200).json({
-            status: 'success',
-            message: 'Статус заказа успешно обновлен',
-            data: updatedOrder
-        });
+        res.status(200).json({ success: true, data: updatedOrder, message: 'Заказ и финансы обновлены' });
     } catch (error) {
-        // Если передан неверный ID и Prisma ничего не нашла, ошибка улетит в глобальный обработчик
+        next(error);
+    }
+};
+
+// ==========================================
+// 4. ПОЛНОЕ УДАЛЕНИЕ ЗАКАЗА
+// ==========================================
+export const deleteOrder = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        // Благодаря onDelete: Cascade в schema.prisma, все связанные расходы (Expenses) 
+        // удалятся автоматически вместе с заказом.
+        await prisma.order.delete({
+            where: { id }
+        });
+
+        res.status(200).json({ success: true, message: 'Заказ безвозвратно удален' });
+    } catch (error) {
         next(error);
     }
 };

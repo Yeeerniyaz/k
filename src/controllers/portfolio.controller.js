@@ -28,7 +28,7 @@ export const getPortfolio = async (req, res, next) => {
 export const addPortfolioItem = async (req, res, next) => {
     try {
         const { title, category, description } = req.body;
-        
+
         // Оставляем поддержку старого способа (если передана просто текстовая ссылка)
         let imageUrl = req.body.imageUrl;
 
@@ -62,6 +62,75 @@ export const addPortfolioItem = async (req, res, next) => {
             status: 'success',
             message: 'Работа успешно добавлена в портфолио',
             data: newItem
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 🔥 НОВОЕ: УДАЛЕНИЕ РАБОТЫ (ДЛЯ АДМИНКИ)
+// ==========================================
+// 3. УДАЛЕНИЕ РАБОТЫ ИЗ БАЗЫ
+// ==========================================
+export const deletePortfolioItem = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        // Сначала проверяем, существует ли такая работа
+        const existingItem = await prisma.portfolio.findUnique({
+            where: { id }
+        });
+
+        if (!existingItem) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Работа не найдена или уже удалена'
+            });
+        }
+
+        // Удаляем запись из базы данных
+        await prisma.portfolio.delete({
+            where: { id }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Работа успешно удалена из портфолио'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 🔥 НОВОЕ: ОБНОВЛЕНИЕ РАБОТЫ (ДЛЯ АДМИНКИ)
+// ==========================================
+// 4. СКРЫТИЕ ИЛИ ИЗМЕНЕНИЕ ТЕКСТА РАБОТЫ
+// ==========================================
+export const updatePortfolioItem = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { title, category, description, isVisible } = req.body;
+
+        const existingItem = await prisma.portfolio.findUnique({ where: { id } });
+        if (!existingItem) {
+            return res.status(404).json({ status: 'error', message: 'Работа не найдена' });
+        }
+
+        // Обновляем только те поля, которые были переданы
+        const updatedItem = await prisma.portfolio.update({
+            where: { id },
+            data: {
+                title: title !== undefined ? title : undefined,
+                category: category !== undefined ? category : undefined,
+                description: description !== undefined ? description : undefined,
+                isVisible: isVisible !== undefined ? Boolean(isVisible) : undefined
+            }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Данные работы обновлены',
+            data: updatedItem
         });
     } catch (error) {
         next(error);

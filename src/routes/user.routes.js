@@ -1,22 +1,44 @@
-import { Router } from 'express';
-import { getMe, getAllUsers } from '../controllers/user.controller.js';
-// 🔥 ИМПОРТ: Подключаем охранников нашего API
-import { protect, restrictTo } from '../middlewares/auth.middleware.js';
+import express from 'express';
+import {
+    getUsers,
+    createUser,
+    updateUser,
+    deleteUser
+} from '../controllers/user.controller.js';
 
-const router = Router();
+// Импортируем наши сеньорские middleware для безопасности
+import { protect, authorize } from '../middlewares/auth.middleware.js';
+
+const router = express.Router();
 
 // ==========================================
-// МАРШРУТЫ ПОЛЬЗОВАТЕЛЕЙ (API ENDPOINTS: /api/users)
+// ГЛОБАЛЬНАЯ ЗАЩИТА (RBAC)
 // ==========================================
+// В отличие от портфолио или прайса, данные сотрудников 
+// никогда не должны быть доступны публично.
+router.use(protect);
 
-// 1. Маршрут: GET /api/users/me
-// Описание: Получить профиль текущего пользователя (для отображения в админке/личном кабинете)
-// Доступ: ЗАЩИЩЕННЫЙ (Доступно всем, у кого есть валидный токен)
-router.get('/me', protect, getMe);
+// ==========================================
+// 1. УПРАВЛЕНИЕ СПИСКОМ СОТРУДНИКОВ
+// ==========================================
+router.route('/')
+    // Просмотр списка сотрудников (Доступно всем авторизованным: ADMIN и MANAGER)
+    .get(getUsers)
 
-// 2. Маршрут: GET /api/users
-// Описание: Получить список всех пользователей системы
-// Доступ: СТРОГО ЗАЩИЩЕННЫЙ (Только для роли ADMIN)
-router.get('/', protect, restrictTo('ADMIN'), getAllUsers);
+    // Регистрация нового сотрудника (с телефоном и паролем)
+    // 🔥 СЕНЬОРСКАЯ ФИЧА: Только администратор может расширять штат
+    .post(authorize('ADMIN'), createUser);
+
+// ==========================================
+// 2. ОПЕРАЦИИ С КОНКРЕТНЫМ АККАУНТОМ
+// ==========================================
+router.route('/:id')
+    // Обновление данных (имя, почта, ТЕЛЕФОН, роль или новый пароль)
+    // Доступно администратору для управления персоналом
+    .put(authorize('ADMIN'), updateUser)
+
+    // Полное удаление (аннулирование) доступа
+    // 🔥 СЕНЬОРСКАЯ ФИЧА: Удалять пользователей может только ГЛАВНЫЙ АДМИН
+    .delete(authorize('ADMIN'), deleteUser);
 
 export default router;
