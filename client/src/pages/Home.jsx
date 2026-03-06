@@ -26,6 +26,7 @@ import {
   Transition,
   rem,
   Checkbox,
+  Tooltip,
 } from "@mantine/core";
 import { useWindowScroll } from "@mantine/hooks";
 import { useNavigate } from "react-router-dom";
@@ -45,6 +46,7 @@ import {
   IconMail,
   IconBrandInstagram,
   IconBrandWhatsapp,
+  IconBrandTiktok,
   IconArrowRight,
   IconCheck,
   IconArrowUp,
@@ -111,7 +113,7 @@ export default function Home() {
   const [activeConfigId, setActiveConfigId] = useState("");
   const [selectedPriceId, setSelectedPriceId] = useState("");
   const [fieldValues, setFieldValues] = useState({ val1: 1, val2: 1 });
-  const [selectedAddons, setSelectedAddons] = useState([]); // массив ID выбранных чекбоксов
+  const [selectedAddons, setSelectedAddons] = useState([]);
 
   // Состояния Лид-формы калькулятора
   const [leadPhone, setLeadPhone] = useState("");
@@ -134,12 +136,10 @@ export default function Home() {
       try {
         setLoadingData(true);
 
-        // 1. Грузим прайс
         const pricesRes = await api.get("/prices");
         const loadedPrices = pricesRes.data?.data || pricesRes.data || [];
         setPriceList(loadedPrices);
 
-        // 2. Грузим настройки калькулятора (то, что собрали в админке)
         const configRes = await api.get("/settings/calculator");
         let loadedConfigs = configRes.data?.config || [];
 
@@ -154,7 +154,6 @@ export default function Home() {
         console.warn("API недоступно. Загружен Сеньорский фоллбэк.");
         setIsDbConnected(false);
 
-        // Демо-прайс
         const demoPrices = [
           {
             id: "p1",
@@ -183,7 +182,6 @@ export default function Home() {
         ];
         setPriceList(demoPrices);
 
-        // Демо-конфигурация (соответствует нашему конструктору)
         const demoConfigs = [
           {
             id: "banners",
@@ -214,7 +212,7 @@ export default function Home() {
             title: "Лайтбоксы",
             calcType: "custom",
             customFormula:
-              "(val1 * val2 * basePrice) + ((val1 * 2 + val2 * 2) * 1500)", // Площадь + Периметр(профиль)
+              "(val1 * val2 * basePrice) + ((val1 * 2 + val2 * 2) * 1500)",
             fields: [
               { name: "val1", label: "Ширина (м)" },
               { name: "val2", label: "Высота (м)" },
@@ -244,7 +242,6 @@ export default function Home() {
   // ==========================================
   const activeConfig = calcConfigs.find((c) => c.id === activeConfigId);
 
-  // Фильтруем прайс-лист для текущего раздела (если linkedPrices пуст, показываем всё)
   const availablePrices = priceList.filter(
     (p) =>
       !activeConfig?.linkedPrices ||
@@ -254,7 +251,6 @@ export default function Home() {
   );
 
   useEffect(() => {
-    // При смене конфигурации сбрасываем поля
     if (activeConfig) {
       if (availablePrices.length > 0) {
         setSelectedPriceId(availablePrices[0].id || availablePrices[0].service);
@@ -267,16 +263,14 @@ export default function Home() {
         newFields[f.name] = 1;
       });
       setFieldValues(newFields);
-      setSelectedAddons([]); // сброс чекбоксов
+      setSelectedAddons([]);
     }
   }, [activeConfigId, calcConfigs, priceList]);
 
-  // Обработчик инпутов
   const handleFieldChange = (name, value) => {
     setFieldValues((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Обработчик чекбоксов (Add-ons)
   const handleAddonChange = (addonId, isChecked) => {
     if (isChecked) {
       setSelectedAddons((prev) => [...prev, addonId]);
@@ -291,7 +285,6 @@ export default function Home() {
   const calculateEstimate = () => {
     if (!activeConfig) return 0;
 
-    // Находим базовую цену
     const selectedPriceItem = availablePrices.find(
       (p) => p.id === selectedPriceId || p.service === selectedPriceId,
     );
@@ -301,7 +294,6 @@ export default function Home() {
     const v1 = fieldValues["val1"] || 0;
     const v2 = fieldValues["val2"] || 0;
 
-    // 1. Расчет по базовой формуле
     if (
       activeConfig.calcType === "area" ||
       activeConfig.calcType === "height_count"
@@ -313,7 +305,6 @@ export default function Home() {
     ) {
       baseTotal = v1 * basePrice;
     } else if (activeConfig.calcType === "custom") {
-      // ПАРСИНГ КАСТОМНОЙ ФОРМУЛЫ
       try {
         let formulaStr = activeConfig.customFormula || "0";
         formulaStr = formulaStr.replace(/basePrice/g, basePrice);
@@ -323,7 +314,6 @@ export default function Home() {
             fieldValues[key],
           );
         });
-        // Безопасное выполнение математики
         baseTotal = new Function("return " + formulaStr)();
       } catch (e) {
         console.error("Ошибка в кастомной формуле", e);
@@ -331,7 +321,6 @@ export default function Home() {
       }
     }
 
-    // 2. Добавление модификаторов (Add-ons)
     let finalTotal = baseTotal;
     let percentAdds = 0;
 
@@ -347,9 +336,7 @@ export default function Home() {
       });
     }
 
-    // Применяем проценты к итогу
     finalTotal = finalTotal + finalTotal * (percentAdds / 100);
-
     return Math.round(finalTotal);
   };
 
@@ -365,7 +352,6 @@ export default function Home() {
       (p) => p.id === selectedPriceId || p.service === selectedPriceId,
     );
 
-    // Собираем умное описание
     let details = `Раздел: ${activeConfig?.title}. Материал: ${selectedPriceItem?.service || "Не выбран"}.\n`;
     activeConfig?.fields.forEach((f) => {
       details += `${f.label}: ${fieldValues[f.name]}. `;
@@ -430,6 +416,7 @@ export default function Home() {
         backgroundColor: "#f8f9fa",
       }}
     >
+      {/* Кнопка скролла наверх */}
       <Affix position={{ bottom: rem(20), right: rem(20) }}>
         <Transition transition="slide-up" mounted={scroll.y > 400}>
           {(transitionStyles) => (
@@ -493,7 +480,9 @@ export default function Home() {
               разработки 3D-дизайна до профессионального монтажа
               металлоконструкций. Собственный цех. Гарантия на все виды работ.
             </Text>
-            <Group mt={40} gap="md">
+
+            {/* Группа основных кнопок */}
+            <Group mt={40} gap="md" justify="center">
               <Button
                 size="xl"
                 radius="md"
@@ -523,6 +512,72 @@ export default function Home() {
               >
                 Смотреть каталог
               </Button>
+              <Button
+                size="xl"
+                radius="md"
+                variant="subtle"
+                color="gray"
+                leftSection={<IconPhoto size={20} />}
+                onClick={() => navigate("/portfolio")}
+                style={{ color: "#1B2E3D" }}
+              >
+                Наше портфолио
+              </Button>
+            </Group>
+
+            {/* 🔥 НОВОЕ: Сверх-минималистичные соцсети прямо под кнопками */}
+            <Group mt={30} gap="lg" justify="center">
+              <Tooltip
+                label="Написать в WhatsApp"
+                withArrow
+                position="bottom"
+                color="teal"
+              >
+                <ActionIcon
+                  component="a"
+                  href="https://wa.me/77770000000"
+                  target="_blank"
+                  variant="transparent"
+                  color="gray"
+                  size="lg"
+                >
+                  <IconBrandWhatsapp size={24} stroke={1.5} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip
+                label="Наш Instagram"
+                withArrow
+                position="bottom"
+                color="dark"
+              >
+                <ActionIcon
+                  component="a"
+                  href="https://instagram.com/royalbanners"
+                  target="_blank"
+                  variant="transparent"
+                  color="gray"
+                  size="lg"
+                >
+                  <IconBrandInstagram size={24} stroke={1.5} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip
+                label="Наш TikTok"
+                withArrow
+                position="bottom"
+                color="dark"
+              >
+                <ActionIcon
+                  component="a"
+                  href="https://tiktok.com/@royalbanners"
+                  target="_blank"
+                  variant="transparent"
+                  color="gray"
+                  size="lg"
+                >
+                  <IconBrandTiktok size={24} stroke={1.5} />
+                </ActionIcon>
+              </Tooltip>
             </Group>
           </Center>
         </Container>
@@ -740,7 +795,6 @@ export default function Home() {
                         </Center>
                       ) : (
                         <>
-                          {/* Выбор раздела калькулятора (из настроек) */}
                           <Select
                             label={
                               <Text style={{ color: "white" }}>
@@ -761,7 +815,6 @@ export default function Home() {
                             }}
                           />
 
-                          {/* Выбор материала (из БД, отфильтровано для раздела) */}
                           {activeConfig && availablePrices.length > 0 && (
                             <Select
                               label={
@@ -784,7 +837,6 @@ export default function Home() {
                             />
                           )}
 
-                          {/* Динамические поля ввода (из настроек) */}
                           {activeConfig && (
                             <Grid>
                               {activeConfig.fields.map((field) => (
@@ -813,7 +865,6 @@ export default function Home() {
                             </Grid>
                           )}
 
-                          {/* Динамические чекбоксы (Add-ons) */}
                           {activeConfig &&
                             activeConfig.addons &&
                             activeConfig.addons.length > 0 && (
@@ -1056,7 +1107,6 @@ export default function Home() {
         </Box>
 
         {/* 5. ЭТАПЫ РАБОТЫ И FAQ */}
-
         <Center mb={40}>
           <Title order={2} style={{ color: "#1B2E3D" }}>
             Ответы на частые вопросы
@@ -1271,6 +1321,7 @@ export default function Home() {
             <Text size="sm" style={{ color: "rgba(255,255,255,0.5)" }}>
               © 2026 Все права защищены.
             </Text>
+
             <Group gap="sm">
               <ActionIcon
                 variant="subtle"
@@ -1278,7 +1329,8 @@ export default function Home() {
                 size="lg"
                 radius="xl"
                 component="a"
-                href="#"
+                href="https://wa.me/77770000000"
+                target="_blank"
                 aria-label="Написать в WhatsApp"
               >
                 <IconBrandWhatsapp size={22} />
@@ -1289,10 +1341,23 @@ export default function Home() {
                 size="lg"
                 radius="xl"
                 component="a"
-                href="#"
+                href="https://instagram.com/royalbanners"
+                target="_blank"
                 aria-label="Перейти в Instagram"
               >
                 <IconBrandInstagram size={22} />
+              </ActionIcon>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="lg"
+                radius="xl"
+                component="a"
+                href="https://tiktok.com/@royalbanners"
+                target="_blank"
+                aria-label="Перейти в TikTok"
+              >
+                <IconBrandTiktok size={22} />
               </ActionIcon>
             </Group>
           </Group>

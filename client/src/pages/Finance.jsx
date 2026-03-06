@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import {
   Title, Text, Paper, Table, Button, Group, ActionIcon, 
   Skeleton, Alert, Tooltip, Modal, Select, NumberInput, 
-  TextInput, Badge, Center, Stack, Grid, Card, ThemeIcon
+  TextInput, Badge, Center, Stack, Grid, Card, ThemeIcon, Divider
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconPlus, IconTrash, IconAlertCircle, IconRefresh, 
-  IconEdit, IconReceipt2, IconWallet, IconCalendarStats
+  IconEdit, IconReceipt2, IconWallet, IconCalendarStats,
+  IconSearch, IconFilter, IconArrowsSort, IconCalendarEvent
 } from '@tabler/icons-react';
 import api from '../api/index.js';
 
@@ -20,13 +21,22 @@ export default function Finance() {
   const [error, setError] = useState(null);
 
   // ==========================================
+  // СОСТОЯНИЯ ФИЛЬТРОВ И СОРТИРОВКИ (НОВОЕ)
+  // ==========================================
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('ALL');
+  const [sortBy, setSortBy] = useState('DATE_DESC');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // ==========================================
   // СОСТОЯНИЯ МОДАЛЬНОГО ОКНА (СОЗДАНИЕ / РЕДАКТИРОВАНИЕ)
   // ==========================================
   const [opened, { open, close }] = useDisclosure(false);
   const [editingId, setEditingId] = useState(null);
   
   // Поля формы
-  const [category, setCategory] = useState('Аренда');
+  const [category, setCategory] = useState('Аренда помещений');
   const [amount, setAmount] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +79,42 @@ export default function Finance() {
   useEffect(() => {
     fetchExpenses();
   }, []);
+
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА: ФИЛЬТРАЦИЯ И СОРТИРОВКА (НОВОЕ)
+  // ==========================================
+  const processedExpenses = [...expenses]
+    .filter((exp) => {
+      // 1. Поиск по тексту (Комментарий)
+      const matchesSearch = (exp.comment || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // 2. Фильтр по категории
+      const matchesCategory = filterCategory === 'ALL' ? true : exp.category === filterCategory;
+
+      // 3. Фильтр по дате (От и До)
+      let matchesDate = true;
+      if (dateFrom && exp.date) {
+        matchesDate = matchesDate && new Date(exp.date) >= new Date(dateFrom);
+      }
+      if (dateTo && exp.date) {
+        const toDateObj = new Date(dateTo);
+        toDateObj.setHours(23, 59, 59, 999); // Конец выбранного дня
+        matchesDate = matchesDate && new Date(exp.date) <= toDateObj;
+      }
+      
+      return matchesSearch && matchesCategory && matchesDate;
+    })
+    .sort((a, b) => {
+      // 4. Сортировка
+      if (sortBy === "DATE_DESC") return new Date(b.date || 0) - new Date(a.date || 0);
+      if (sortBy === "DATE_ASC") return new Date(a.date || 0) - new Date(b.date || 0);
+      if (sortBy === "AMOUNT_DESC") return (b.amount || 0) - (a.amount || 0);
+      if (sortBy === "AMOUNT_ASC") return (a.amount || 0) - (b.amount || 0);
+      return 0;
+    });
+
+  // Расчет итогов для верхних карточек на основе ОТФИЛЬТРОВАННЫХ данных
+  const totalExpensesAmount = processedExpenses.reduce((sum, item) => sum + item.amount, 0);
 
   // ==========================================
   // БИЗНЕС-ЛОГИКА: ОТКРЫТИЕ МОДАЛКИ
@@ -160,9 +206,6 @@ export default function Finance() {
     });
   };
 
-  // Расчет итогов для верхних карточек
-  const totalExpensesAmount = expenses.reduce((sum, item) => sum + item.amount, 0);
-
   return (
     <div style={{ fontFamily: '"Google Sans", sans-serif' }}>
       
@@ -199,13 +242,13 @@ export default function Finance() {
       )}
 
       {/* ========================================== */}
-      {/* МИНИ-ДАШБОРД РАСХОДОВ */}
+      {/* МИНИ-ДАШБОРД РАСХОДОВ (ДИНАМИЧЕСКИЙ) */}
       {/* ========================================== */}
       <Grid mb="xl">
         <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
           <Card withBorder padding="lg" radius="md" shadow="sm" style={{ borderLeft: '4px solid #fa5252' }}>
             <Group justify="space-between">
-              <Text size="sm" c="dimmed" fw={600} tt="uppercase">Сумма общих расходов</Text>
+              <Text size="sm" c="dimmed" fw={600} tt="uppercase">Сумма расходов</Text>
               <ThemeIcon color="red" variant="light" size={38} radius="md">
                 <IconWallet size={20} stroke={1.5} />
               </ThemeIcon>
@@ -215,27 +258,87 @@ export default function Finance() {
                 {totalExpensesAmount.toLocaleString('ru-RU')} ₸
               </Text>
             </Group>
-            <Text size="xs" c="dimmed" mt={7}>За весь период учета</Text>
+            <Text size="xs" c="dimmed" mt={7}>
+              {filterCategory !== 'ALL' || dateFrom || dateTo ? 'По выбранным фильтрам' : 'За весь период учета'}
+            </Text>
           </Card>
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
           <Card withBorder padding="lg" radius="md" shadow="sm" style={{ borderLeft: '4px solid #1B2E3D' }}>
             <Group justify="space-between">
-              <Text size="sm" c="dimmed" fw={600} tt="uppercase">Количество транзакций</Text>
+              <Text size="sm" c="dimmed" fw={600} tt="uppercase">Транзакций</Text>
               <ThemeIcon style={{ backgroundColor: '#1B2E3D' }} variant="filled" size={38} radius="md">
                 <IconReceipt2 size={20} stroke={1.5} />
               </ThemeIcon>
             </Group>
             <Group align="flex-end" gap="xs" mt={25}>
               <Text style={{ fontSize: '28px', fontWeight: 700, color: '#1B2E3D' }}>
-                {expenses.length}
+                {processedExpenses.length}
               </Text>
             </Group>
-            <Text size="xs" c="dimmed" mt={7}>Записей в базе данных</Text>
+            <Text size="xs" c="dimmed" mt={7}>Отображаемых записей</Text>
           </Card>
         </Grid.Col>
       </Grid>
+
+      {/* ========================================== */}
+      {/* ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ (НОВЫЙ БЛОК) */}
+      {/* ========================================== */}
+      <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
+        <Grid align="flex-end">
+          <Grid.Col span={{ base: 12, md: 3 }}>
+            <TextInput
+              label="Поиск по комментариям"
+              placeholder="Введите текст..."
+              leftSection={<IconSearch size={16} />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.currentTarget.value)}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 3 }}>
+            <Select
+              label="Категория"
+              leftSection={<IconFilter size={16} />}
+              data={[{ value: "ALL", label: "Все категории" }, ...expenseCategories.map(c => ({ value: c, label: c }))]}
+              value={filterCategory}
+              onChange={setFilterCategory}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+            <TextInput 
+              type="date" 
+              label="Период с" 
+              value={dateFrom} 
+              onChange={(e) => setDateFrom(e.currentTarget.value)} 
+              leftSection={<IconCalendarEvent size={16} />}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+            <TextInput 
+              type="date" 
+              label="Период по" 
+              value={dateTo} 
+              onChange={(e) => setDateTo(e.currentTarget.value)} 
+              leftSection={<IconCalendarEvent size={16} />}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 2 }}>
+            <Select
+              label="Сортировка"
+              leftSection={<IconArrowsSort size={16} />}
+              data={[
+                { value: "DATE_DESC", label: "Новые (Дата)" },
+                { value: "DATE_ASC", label: "Старые (Дата)" },
+                { value: "AMOUNT_DESC", label: "Дорогие (Сумма)" },
+                { value: "AMOUNT_ASC", label: "Дешевые (Сумма)" },
+              ]}
+              value={sortBy}
+              onChange={setSortBy}
+            />
+          </Grid.Col>
+        </Grid>
+      </Paper>
 
       {/* ========================================== */}
       {/* ТАБЛИЦА РАСХОДОВ */}
@@ -248,7 +351,7 @@ export default function Finance() {
             <Skeleton height={40} mb="sm" />
             <Skeleton height={40} />
           </div>
-        ) : expenses.length > 0 ? (
+        ) : processedExpenses.length > 0 ? (
           <Table striped highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
             <Table.Thead style={{ backgroundColor: '#f8f9fa' }}>
               <Table.Tr>
@@ -260,7 +363,7 @@ export default function Finance() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {expenses.map((item) => (
+              {processedExpenses.map((item) => (
                 <Table.Tr key={item.id}>
                   {/* Дата */}
                   <Table.Td>
@@ -313,9 +416,14 @@ export default function Finance() {
         ) : (
           <Center style={{ padding: '60px 20px', flexDirection: 'column' }}>
             <IconReceipt2 size={48} color="#e0e0e0" stroke={1.5} />
-            <Text size="lg" fw={500} mt="md" style={{ color: '#1B2E3D' }}>Нет записанных расходов</Text>
-            <Text c="dimmed" mt={5}>Добавьте операционные затраты для точного расчета прибыли.</Text>
-            <Button mt="md" variant="default" onClick={() => handleOpenModal()}>Добавить транзакцию</Button>
+            <Text size="lg" fw={500} mt="md" style={{ color: '#1B2E3D' }}>Транзакции не найдены</Text>
+            <Text c="dimmed" mt={5}>Попробуйте изменить параметры поиска или фильтрации.</Text>
+            <Button mt="md" variant="default" onClick={() => {
+              setSearchTerm('');
+              setFilterCategory('ALL');
+              setDateFrom('');
+              setDateTo('');
+            }}>Сбросить фильтры</Button>
           </Center>
         )}
       </Paper>

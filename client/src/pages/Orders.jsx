@@ -32,6 +32,9 @@ import {
   IconFileText,
   IconReceipt,
   IconCalculator,
+  IconSearch,
+  IconFilter,
+  IconArrowsSort,
 } from "@tabler/icons-react";
 import api from "../api/index.js";
 
@@ -42,6 +45,13 @@ export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // ==========================================
+  // СОСТОЯНИЯ ФИЛЬТРОВ И СОРТИРОВКИ (НОВОЕ)
+  // ==========================================
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [sortBy, setSortBy] = useState("DATE_DESC");
 
   // ==========================================
   // СОСТОЯНИЯ МОДАЛЬНОГО ОКНА (РЕДАКТИРОВАНИЕ)
@@ -78,7 +88,7 @@ export default function Orders() {
           id: "dev-1",
           clientName: "Тест Калькулятор",
           clientPhone: "+7 777 111 22 33",
-          description: "Лайтбокс 2х1м",
+          description: "Лайтбокс 2х1м (Заявка с калькулятора)",
           status: "NEW",
           price: 45000,
           expenses: [
@@ -95,11 +105,11 @@ export default function Orders() {
           id: "dev-2",
           clientName: "Иван Иванов",
           clientPhone: "+7 701 000 00 00",
-          description: "Объемные буквы",
+          description: "Объемные буквы (Свяжитесь с нами)",
           status: "PENDING",
           price: 120000,
           expenses: [],
-          createdAt: new Date().toISOString(),
+          createdAt: new Date(Date.now() - 86400000).toISOString(), // Вчера
         },
       ]);
       setError("Не удалось загрузить боевые заказы. Показаны тестовые данные.");
@@ -111,6 +121,29 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА: ФИЛЬТРАЦИЯ И СОРТИРОВКА (НОВОЕ)
+  // ==========================================
+  const processedOrders = [...orders]
+    .filter((order) => {
+      // 1. Поиск по тексту (Имя клиента, ID, Описание/Источник)
+      const searchString = `${order.clientName || ""} ${order.id || ""} ${order.description || ""}`.toLowerCase();
+      const matchesSearch = searchString.includes(searchTerm.toLowerCase());
+      
+      // 2. Фильтр по статусу
+      const matchesStatus = filterStatus === "ALL" ? true : order.status === filterStatus;
+      
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // 3. Сортировка
+      if (sortBy === "DATE_DESC") return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      if (sortBy === "DATE_ASC") return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      if (sortBy === "PRICE_DESC") return (b.price || 0) - (a.price || 0);
+      if (sortBy === "PRICE_ASC") return (a.price || 0) - (b.price || 0);
+      return 0;
+    });
 
   // ==========================================
   // БИЗНЕС-ЛОГИКА: ОТКРЫТИЕ МОДАЛКИ
@@ -318,6 +351,49 @@ export default function Orders() {
       )}
 
       {/* ========================================== */}
+      {/* ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ (НОВЫЙ БЛОК) */}
+      {/* ========================================== */}
+      <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <TextInput
+              placeholder="Поиск по клиенту, ID или источнику (калькулятор)..."
+              leftSection={<IconSearch size={16} />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.currentTarget.value)}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <Select
+              leftSection={<IconFilter size={16} />}
+              data={[
+                { value: "ALL", label: "Все статусы" },
+                { value: "NEW", label: "Новые (Лиды с сайта)" },
+                { value: "PENDING", label: "В работе (Производство)" },
+                { value: "COMPLETED", label: "Выполненные (Оплачены)" },
+                { value: "CANCELED", label: "Отмененные" },
+              ]}
+              value={filterStatus}
+              onChange={setFilterStatus}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <Select
+              leftSection={<IconArrowsSort size={16} />}
+              data={[
+                { value: "DATE_DESC", label: "Сначала новые (по дате)" },
+                { value: "DATE_ASC", label: "Сначала старые (по дате)" },
+                { value: "PRICE_DESC", label: "Сначала дорогие (по сумме)" },
+                { value: "PRICE_ASC", label: "Сначала дешевые (по сумме)" },
+              ]}
+              value={sortBy}
+              onChange={setSortBy}
+            />
+          </Grid.Col>
+        </Grid>
+      </Paper>
+
+      {/* ========================================== */}
       {/* ОСНОВНАЯ ТАБЛИЦА ЗАКАЗОВ */}
       {/* ========================================== */}
       <Paper
@@ -333,7 +409,7 @@ export default function Orders() {
             <Skeleton height={40} mb="sm" />
             <Skeleton height={40} />
           </div>
-        ) : orders.length > 0 ? (
+        ) : processedOrders.length > 0 ? (
           <Table
             striped
             highlightOnHover
@@ -353,7 +429,7 @@ export default function Orders() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {orders.map((order) => (
+              {processedOrders.map((order) => (
                 <Table.Tr key={order.id}>
                   <Table.Td>
                     <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
@@ -418,10 +494,10 @@ export default function Orders() {
         ) : (
           <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
             <Text size="lg" fw={500} style={{ color: "#1B2E3D" }}>
-              Заказов пока нет
+              Заказы не найдены
             </Text>
             <Text c="dimmed" mt={5}>
-              Ожидайте новые заявки с сайта.
+              Попробуйте изменить параметры поиска или фильтрации.
             </Text>
           </Center>
         )}

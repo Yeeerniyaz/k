@@ -3,12 +3,13 @@ import {
   Title, Text, Paper, Button, Group, ActionIcon, 
   Skeleton, Alert, Select, TextInput, Badge, Center, 
   Stack, Accordion, Divider, Grid, ThemeIcon, MultiSelect, 
-  Tooltip, NumberInput, Table, Box // 🔥 Добавили Box сюда!
+  Tooltip, NumberInput, Table, Box
 } from '@mantine/core';
 import { 
   IconPlus, IconTrash, IconAlertCircle, IconRefresh, 
   IconCalculator, IconMathFunction, IconSettings, 
-  IconDeviceFloppy, IconCode, IconChecklist
+  IconDeviceFloppy, IconCode, IconChecklist,
+  IconCopy, IconArrowUp, IconArrowDown // 🔥 Добавлены новые иконки для Enterprise фич
 } from '@tabler/icons-react';
 import api from '../api/index.js';
 
@@ -133,6 +134,33 @@ export default function CalculatorSettings() {
     setConfigs(newConfigs);
   };
 
+  // 🔥 НОВОЕ: Дублирование (Клонирование) существующего блока
+  const handleCloneConfig = (index) => {
+    const configToClone = configs[index];
+    const clonedConfig = {
+      ...JSON.parse(JSON.stringify(configToClone)), // Глубокая копия, чтобы не мутировать вложенные массивы
+      id: `section_${Date.now()}`,
+      title: `${configToClone.title} (Копия)`
+    };
+    const newConfigs = [...configs];
+    newConfigs.splice(index + 1, 0, clonedConfig); // Вставляем сразу после текущего
+    setConfigs(newConfigs);
+  };
+
+  // 🔥 НОВОЕ: Перемещение блока вверх/вниз
+  const handleMoveConfig = (index, direction) => {
+    if (direction === 'up' && index > 0) {
+      const newConfigs = [...configs];
+      [newConfigs[index - 1], newConfigs[index]] = [newConfigs[index], newConfigs[index - 1]];
+      setConfigs(newConfigs);
+    }
+    if (direction === 'down' && index < configs.length - 1) {
+      const newConfigs = [...configs];
+      [newConfigs[index + 1], newConfigs[index]] = [newConfigs[index], newConfigs[index + 1]];
+      setConfigs(newConfigs);
+    }
+  };
+
   // ==========================================
   // ФУНКЦИИ КОНСТРУКТОРА: ПОЛЯ ВВОДА (ДЛЯ КАСТОМА)
   // ==========================================
@@ -255,7 +283,11 @@ export default function CalculatorSettings() {
             <Center p="xl"><Text c="dimmed">Калькулятор пуст. Добавьте первый блок.</Text></Center>
           ) : (
             <Accordion variant="separated" radius="md">
-              {configs.map((config, cIndex) => (
+              {configs.map((config, cIndex) => {
+                // 🔥 НОВОЕ: Проверка валидности блока
+                const isReady = config.linkedPrices && config.linkedPrices.length > 0;
+                
+                return (
                 <Accordion.Item key={config.id} value={config.id} style={{ border: '1px solid #eaeaea' }}>
                   
                   {/* ЗАГОЛОВОК АККОРДЕОНА */}
@@ -265,9 +297,15 @@ export default function CalculatorSettings() {
                         <IconCalculator size={20} color={config.calcType === 'custom' ? 'orange' : '#1B2E3D'} />
                         <Text fw={600} style={{ color: '#1B2E3D' }}>{config.title || 'Безымянный раздел'}</Text>
                       </Group>
-                      <Badge color={config.calcType === 'custom' ? 'orange' : 'gray'} variant="light">
-                        {formulaTypes.find(f => f.value === config.calcType)?.label || 'Формула'}
-                      </Badge>
+                      <Group gap="xs">
+                        {/* Валидатор состояния */}
+                        {!isReady && (
+                          <Badge color="red" variant="dot">Нет базовых цен</Badge>
+                        )}
+                        <Badge color={config.calcType === 'custom' ? 'orange' : 'gray'} variant="light">
+                          {formulaTypes.find(f => f.value === config.calcType)?.label || 'Формула'}
+                        </Badge>
+                      </Group>
                     </Group>
                   </Accordion.Control>
                   
@@ -432,19 +470,43 @@ export default function CalculatorSettings() {
                           value={config.linkedPrices || []}
                           onChange={(val) => handleChangeConfig(cIndex, 'linkedPrices', val)}
                         />
+                        {!isReady && (
+                          <Text color="red" size="sm" mt="xs">⚠️ Обязательно выберите хотя бы один материал, иначе блок не будет работать в калькуляторе!</Text>
+                        )}
                       </Paper>
 
-                      {/* 5. УДАЛЕНИЕ БЛОКА */}
-                      <Group justify="flex-end">
-                        <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => handleRemoveConfig(cIndex)}>
-                          Удалить раздел полностью
-                        </Button>
+                      {/* 5. ПАНЕЛЬ ДЕЙСТВИЙ БЛОКА (НОВЫЙ ENTERPRISE БЛОК) */}
+                      <Divider />
+                      <Group justify="space-between">
+                        {/* Стрелки вверх-вниз для сортировки */}
+                        <Group gap="xs">
+                          <Tooltip label="Переместить выше">
+                            <ActionIcon variant="light" color="gray" onClick={() => handleMoveConfig(cIndex, 'up')} disabled={cIndex === 0}>
+                              <IconArrowUp size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Переместить ниже">
+                            <ActionIcon variant="light" color="gray" onClick={() => handleMoveConfig(cIndex, 'down')} disabled={cIndex === configs.length - 1}>
+                              <IconArrowDown size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
+                        
+                        {/* Копирование и Удаление */}
+                        <Group gap="sm">
+                          <Button variant="light" color="blue" leftSection={<IconCopy size={16} />} onClick={() => handleCloneConfig(cIndex)}>
+                            Дублировать блок
+                          </Button>
+                          <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => handleRemoveConfig(cIndex)}>
+                            Удалить раздел
+                          </Button>
+                        </Group>
                       </Group>
 
                     </Stack>
                   </Accordion.Panel>
                 </Accordion.Item>
-              ))}
+              )})}
             </Accordion>
           )}
         </Paper>

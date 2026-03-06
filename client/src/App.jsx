@@ -18,7 +18,8 @@ import Users from './pages/Users.jsx';
 import Category from './pages/Category.jsx';
 import Prices from './pages/Prices.jsx'; 
 import Finance from './pages/Finance.jsx';
-import CalculatorSettings from './pages/CalculatorSettings.jsx'; // 🔥 Подключили конструктор калькулятора
+import CalculatorSettings from './pages/CalculatorSettings.jsx';
+import PublicPortfolio from './pages/PublicPortfolio.jsx'; // 🔥 НОВОЕ: Публичная страница портфолио
 
 // ==========================================
 // СЕНЬОРСКАЯ АРХИТЕКТУРА: ИЗОЛИРОВАННАЯ АДМИНКА
@@ -161,6 +162,7 @@ export default function App() {
       {/* 1. ПУБЛИЧНАЯ ЗОНА (Доступна всем клиентам) */}
       <Route path="/" element={<Home />} />
       <Route path="/category/:id" element={<Category />} />
+      <Route path="/portfolio" element={<PublicPortfolio />} /> {/* 🔥 НОВОЕ: Маршрут для портфолио */}
 
       {/* 2. АВТОРИЗАЦИЯ */}
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/admin" replace />} />
