@@ -1,15 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
 
+dotenv.config();
 
-// Инициализируем клиент явно
-const prisma = new PrismaClient();
+// 🔥 СЕНЬОРСКИЙ ФИКС: Явно указываем URL через современный параметр datasourceUrl
+const prisma = new PrismaClient({
+    datasourceUrl: process.env.DATABASE_URL
+});
 
 async function seed() {
     console.log('🚀 Запуск скрипта создания администратора...');
 
-    const email = 'admin@royalbanners.kz';
-    const password = 'RoyalAdmin2026!';
+    const email = process.env.ADMIN_EMAIL || 'admin@royalbanners.kz';
+    const password = process.env.ADMIN_PASSWORD || 'RoyalAdmin2026!';
 
     try {
         // 1. Проверяем, есть ли уже админ в базе
@@ -36,16 +40,19 @@ async function seed() {
         });
 
         console.log('======================================');
-        console.log('✅ СУПЕР-АДМИНИСТРАТОР СОЗДАН!');
+        console.log('✅ СУПЕР-АДМИНИСТРАТОР УСПЕШНО СОЗДАН!');
         console.log(`📧 Email: ${admin.email}`);
         console.log(`🔑 Password: ${password}`);
         console.log('ℹ️  Сохраните эти данные для входа.');
         console.log('======================================');
 
     } catch (error) {
-        console.error('💥 Ошибка при создании админа:', error);
+        if (error.code === 'P2002') {
+            console.log('✅ Админ уже существует в базе (сработала защита от дублей)!');
+        } else {
+            console.error('💥 Ошибка при создании админа:', error.message);
+        }
     } finally {
-        // Обязательно закрываем соединение, чтобы скрипт завершился
         await prisma.$disconnect();
     }
 }
