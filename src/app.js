@@ -73,7 +73,7 @@ const clientBuildPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientBuildPath));
 
 // Если маршрут не начинается с /api, отдаем React-приложение
-app.get('*', (req, res, next) => {
+app.get('*path', (req, res, next) => {
     if (req.originalUrl.startsWith('/api')) {
         return next(); // Пропускаем дальше к обработчику 404 для API
     }
