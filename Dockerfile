@@ -5,7 +5,15 @@
 FROM node:22-slim AS frontend-builder
 
 # Создаем папку для фронтенда
+WORKDIR /build/client
 
+# Копируем package.json клиента и устанавливаем зависимости
+COPY client/package*.json ./
+RUN npm install
+
+# Копируем весь код клиента и собираем его (Vite создаст папку dist)
+COPY client/ ./
+RUN npm run build
 
 # ==========================================
 # ЭТАП 2: ФИНАЛЬНЫЙ ОБРАЗ БЭКЕНДА (PRODUCTION)
