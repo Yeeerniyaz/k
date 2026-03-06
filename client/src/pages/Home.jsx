@@ -642,7 +642,7 @@ export default function Home() {
                         style={{ color: "white" }}
                         mb="xs"
                       >
-                        Зафиксировать цену и получить макет
+                        Получить точную смету от инженера
                       </Text>
                       <TextInput
                         placeholder="+7 (___) ___-__-__"
@@ -668,7 +668,7 @@ export default function Home() {
                           fontWeight: 700,
                         }}
                       >
-                        Зафиксировать скидку
+                        Отправить запрос
                       </Button>
                     </Box>
                   </Stack>
