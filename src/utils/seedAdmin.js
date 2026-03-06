@@ -1,19 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import dotenv from 'dotenv';
 
-dotenv.config();
+// 🔥 СЕНЬОРСКИЙ ХАК: Если терминал Docker потерял переменные, мы задаем их принудительно!
+process.env.DATABASE_URL = process.env.DATABASE_URL || "postgresql://yeee:Qazplm01@datebase:5432/royal_banners?schema=public";
+process.env.ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@royalbanners.kz";
+process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "RoyalAdmin2026!";
 
-// 🔥 СЕНЬОРСКИЙ ФИКС: Явно указываем URL через современный параметр datasourceUrl
-const prisma = new PrismaClient({
-    datasourceUrl: process.env.DATABASE_URL
-});
+// Инициализируем абсолютно чистым вызовом (Prisma сама подхватит URL из process.env)
+const prisma = new PrismaClient();
 
 async function seed() {
     console.log('🚀 Запуск скрипта создания администратора...');
 
-    const email = process.env.ADMIN_EMAIL || 'admin@royalbanners.kz';
-    const password = process.env.ADMIN_PASSWORD || 'RoyalAdmin2026!';
+    const email = process.env.ADMIN_EMAIL;
+    const password = process.env.ADMIN_PASSWORD;
 
     try {
         // 1. Проверяем, есть ли уже админ в базе
