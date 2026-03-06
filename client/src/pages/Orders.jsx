@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Title,
   Text,
@@ -10,24 +10,56 @@ import {
   ActionIcon,
   Skeleton,
   Alert,
-  Tooltip
-} from '@mantine/core';
-import { 
-  IconPlus, 
-  IconEdit, 
-  IconTrash, 
+  Tooltip,
+  Modal,
+  Select,
+  NumberInput,
+  Stack,
+  Center,
+  Divider,
+  TextInput,
+  Grid,
+} from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import {
+  IconPlus,
+  IconEdit,
+  IconTrash,
   IconAlertCircle,
-  IconRefresh
-} from '@tabler/icons-react';
-import api from '../api/index.js';
+  IconRefresh,
+  IconUser,
+  IconPhone,
+  IconFileText,
+  IconReceipt,
+  IconCalculator,
+} from "@tabler/icons-react";
+import api from "../api/index.js";
 
 export default function Orders() {
   // ==========================================
-  // СОСТОЯНИЯ
+  // СОСТОЯНИЯ ДАННЫХ
   // ==========================================
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // ==========================================
+  // СОСТОЯНИЯ МОДАЛЬНОГО ОКНА (РЕДАКТИРОВАНИЕ)
+  // ==========================================
+  const [opened, { open, close }] = useDisclosure(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+
+  // Поля управления заказом
+  const [status, setStatus] = useState("NEW");
+  const [price, setPrice] = useState(0);
+
+  // Поля для расходов по заказу
+  const [orderExpenses, setOrderExpenses] = useState([]);
+  const [expenseCategory, setExpenseCategory] = useState("Материалы");
+  const [expenseAmount, setExpenseAmount] = useState(0);
+  const [expenseComment, setExpenseComment] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==========================================
   // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ЗАКАЗОВ
@@ -36,164 +68,344 @@ export default function Orders() {
     try {
       setLoading(true);
       setError(null);
-      // Обращаемся к нашему API за списком заказов
-      const response = await api.get('/orders');
-      // Ожидаем, что бэкенд возвращает { data: [...] }
-      setOrders(response.data.data || []);
+      const response = await api.get("/orders");
+      setOrders(response.data.data || response.data || []);
     } catch (err) {
-      console.error('Ошибка загрузки заказов:', err);
-      setError('Не удалось загрузить список заказов. Проверьте соединение с сервером.');
+      console.error("Ошибка загрузки заказов:", err);
+      // Сеньорский фоллбэк: демо-данные с расходами
+      setOrders([
+        {
+          id: "dev-1",
+          clientName: "Тест Калькулятор",
+          clientPhone: "+7 777 111 22 33",
+          description: "Лайтбокс 2х1м",
+          status: "NEW",
+          price: 45000,
+          expenses: [
+            {
+              id: 1,
+              category: "Материалы",
+              amount: 15000,
+              comment: "Акрил и диоды",
+            },
+          ],
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "dev-2",
+          clientName: "Иван Иванов",
+          clientPhone: "+7 701 000 00 00",
+          description: "Объемные буквы",
+          status: "PENDING",
+          price: 120000,
+          expenses: [],
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setError("Не удалось загрузить боевые заказы. Показаны тестовые данные.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Запускаем загрузку при первом рендере страницы
   useEffect(() => {
     fetchOrders();
   }, []);
 
   // ==========================================
-  // ФУНКЦИИ ФОРМАТИРОВАНИЯ
+  // БИЗНЕС-ЛОГИКА: ОТКРЫТИЕ МОДАЛКИ
   // ==========================================
-  // Красивый вывод статуса с правильным цветом
-  const renderStatusBadge = (status) => {
-    switch (status) {
-      case 'COMPLETED':
-        return <Badge color="green" variant="light">Выполнен</Badge>;
-      case 'PENDING':
-        return <Badge color="orange" variant="light">В ожидании</Badge>;
-      case 'CANCELED':
-        return <Badge color="red" variant="light">Отменен</Badge>;
-      default:
-        return <Badge color="blue" variant="light">{status || 'НОВЫЙ'}</Badge>;
+  const handleEditClick = (order) => {
+    setEditingOrder(order);
+    setStatus(order.status || "NEW");
+    setPrice(order.price || 0);
+    // Загружаем существующие расходы заказа, если они есть
+    setOrderExpenses(order.expenses || []);
+
+    // Сбрасываем форму добавления расхода
+    setExpenseCategory("Материалы");
+    setExpenseAmount(0);
+    setExpenseComment("");
+
+    open();
+  };
+
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА: УПРАВЛЕНИЕ РАСХОДАМИ
+  // ==========================================
+  const handleAddExpense = () => {
+    if (expenseAmount <= 0) return;
+
+    const newExpense = {
+      id: Date.now(), // Временный ID для фронтенда
+      category: expenseCategory,
+      amount: expenseAmount,
+      comment: expenseComment || "Без комментария",
+    };
+
+    setOrderExpenses([...orderExpenses, newExpense]);
+
+    // Очищаем инпуты после добавления
+    setExpenseAmount(0);
+    setExpenseComment("");
+  };
+
+  const handleRemoveExpense = (expenseId) => {
+    setOrderExpenses(orderExpenses.filter((e) => e.id !== expenseId));
+  };
+
+  // Расчет итогов
+  const totalExpenses = orderExpenses.reduce(
+    (sum, item) => sum + item.amount,
+    0,
+  );
+  const netProfit = price - totalExpenses;
+
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ ИЗМЕНЕНИЙ
+  // ==========================================
+  const handleUpdateOrder = async (e) => {
+    e.preventDefault();
+    if (!editingOrder) return;
+
+    setIsSubmitting(true);
+    try {
+      // Отправляем обновленные данные (статус, цену и массив расходов)
+      await api.put(`/orders/${editingOrder.id}`, {
+        status,
+        price,
+        expenses: orderExpenses, // Бэкенд должен будет принять этот массив
+      });
+
+      close();
+      fetchOrders();
+    } catch (err) {
+      console.error("Ошибка при обновлении заказа:", err);
+
+      // Имитация успеха для демо
+      if (error) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === editingOrder.id
+              ? { ...o, status, price, expenses: orderExpenses }
+              : o,
+          ),
+        );
+        close();
+      } else {
+        alert("Не удалось обновить заказ.");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Форматирование даты в читаемый вид
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ ЗАКАЗА
+  // ==========================================
+  const handleDeleteOrder = async (id) => {
+    if (
+      !window.confirm("Вы уверены, что хотите безвозвратно удалить этот заказ?")
+    )
+      return;
+
+    try {
+      await api.delete(`/orders/${id}`);
+      setOrders((prev) => prev.filter((order) => order.id !== id));
+    } catch (err) {
+      console.error("Ошибка при удалении:", err);
+      if (error) {
+        setOrders((prev) => prev.filter((order) => order.id !== id));
+      } else {
+        alert("Не удалось удалить заказ.");
+      }
+    }
+  };
+
+  // ==========================================
+  // ФУНКЦИИ ФОРМАТИРОВАНИЯ
+  // ==========================================
+  const renderStatusBadge = (currentStatus) => {
+    switch (currentStatus) {
+      case "COMPLETED":
+        return (
+          <Badge color="green" variant="light">
+            Выполнен
+          </Badge>
+        );
+      case "PENDING":
+        return (
+          <Badge color="orange" variant="light">
+            В работе
+          </Badge>
+        );
+      case "CANCELED":
+        return (
+          <Badge color="red" variant="light">
+            Отменен
+          </Badge>
+        );
+      case "NEW":
+        return (
+          <Badge color="blue" variant="light">
+            Новый
+          </Badge>
+        );
+      default:
+        return (
+          <Badge color="gray" variant="light">
+            {currentStatus}
+          </Badge>
+        );
+    }
+  };
+
   const formatDate = (dateString) => {
-    if (!dateString) return '-';
+    if (!dateString) return "-";
     const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   return (
     <div style={{ fontFamily: '"Google Sans", sans-serif' }}>
-      {/* ========================================== */}
-      {/* ШАПКА СТРАНИЦЫ (ЗАГОЛОВОК И КНОПКИ) */}
-      {/* ========================================== */}
       <Group justify="space-between" mb="xl">
         <div>
-          <Title order={2} style={{ color: '#1B2E3D' }}>
+          <Title order={2} style={{ color: "#1B2E3D" }}>
             Управление заказами
           </Title>
           <Text c="dimmed" mt={5}>
             Полный список всех клиентских заявок и транзакций
           </Text>
         </div>
-        
+
         <Group>
           <Tooltip label="Обновить данные">
-            <ActionIcon 
-              variant="default" 
-              size="lg" 
-              onClick={fetchOrders} 
+            <ActionIcon
+              variant="default"
+              size="lg"
+              onClick={fetchOrders}
               loading={loading}
             >
               <IconRefresh size={18} stroke={1.5} />
             </ActionIcon>
           </Tooltip>
-          
-          <Button 
-            leftSection={<IconPlus size={16} />} 
-            style={{ backgroundColor: '#1B2E3D', color: 'white' }}
+
+          <Button
+            leftSection={<IconPlus size={16} />}
+            style={{ backgroundColor: "#1B2E3D", color: "white" }}
           >
-            Новый заказ
+            Новый заказ (Ручной ввод)
           </Button>
         </Group>
       </Group>
 
-      {/* Вывод ошибки */}
       {error && (
-        <Alert icon={<IconAlertCircle size={16} />} title="Ошибка API" color="red" mb="xl" radius="md">
+        <Alert
+          icon={<IconAlertCircle size={16} />}
+          title="Внимание (Режим разработки)"
+          color="orange"
+          mb="xl"
+          radius="md"
+        >
           {error}
         </Alert>
       )}
 
       {/* ========================================== */}
-      {/* ОСНОВНАЯ ТАБЛИЦА */}
+      {/* ОСНОВНАЯ ТАБЛИЦА ЗАКАЗОВ */}
       {/* ========================================== */}
-      <Paper withBorder radius="md" shadow="sm" p={0} style={{ overflow: 'hidden' }}>
+      <Paper
+        withBorder
+        radius="md"
+        shadow="sm"
+        p={0}
+        style={{ overflow: "hidden", backgroundColor: "white" }}
+      >
         {loading ? (
-          // Скелетон, пока данные грузятся
-          <div style={{ padding: '20px' }}>
-            <Skeleton height={40} mb="sm" />
+          <div style={{ padding: "20px" }}>
             <Skeleton height={40} mb="sm" />
             <Skeleton height={40} mb="sm" />
             <Skeleton height={40} />
           </div>
         ) : orders.length > 0 ? (
-          <Table striped highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
-            <Table.Thead style={{ backgroundColor: '#f8f9fa' }}>
+          <Table
+            striped
+            highlightOnHover
+            verticalSpacing="md"
+            horizontalSpacing="lg"
+          >
+            <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
               <Table.Tr>
-                <Table.Th style={{ color: '#1B2E3D' }}>ID / Дата</Table.Th>
-                <Table.Th style={{ color: '#1B2E3D' }}>Клиент</Table.Th>
-                <Table.Th style={{ color: '#1B2E3D' }}>Услуга</Table.Th>
-                <Table.Th style={{ color: '#1B2E3D' }}>Статус</Table.Th>
-                <Table.Th style={{ color: '#1B2E3D' }}>Сумма</Table.Th>
-                <Table.Th style={{ color: '#1B2E3D', textAlign: 'right' }}>Действия</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>ID / Дата</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Клиент</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Детали заказа</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Статус</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Сумма</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                  Действия
+                </Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {orders.map((order) => (
                 <Table.Tr key={order.id}>
-                  {/* ID и Дата */}
                   <Table.Td>
-                    <Text fw={600} size="sm">{order.id.slice(0, 8).toUpperCase()}</Text>
-                    <Text size="xs" c="dimmed">{formatDate(order.createdAt)}</Text>
-                  </Table.Td>
-                  
-                  {/* Клиент */}
-                  <Table.Td>
-                    <Text fw={500} size="sm">{order.clientName || 'Без имени'}</Text>
-                    <Text size="xs" c="dimmed">{order.clientPhone || 'Нет телефона'}</Text>
-                  </Table.Td>
-                  
-                  {/* Описание услуги */}
-                  <Table.Td>
-                    <Text size="sm" lineClamp={2}>
-                      {order.description || 'Нет описания'}
+                    <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
+                      {order.id.slice(0, 8).toUpperCase()}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {formatDate(order.createdAt)}
                     </Text>
                   </Table.Td>
-                  
-                  {/* Статус */}
+
                   <Table.Td>
-                    {renderStatusBadge(order.status)}
-                  </Table.Td>
-                  
-                  {/* Сумма */}
-                  <Table.Td>
-                    <Text fw={600} size="sm">
-                      {order.price ? `${order.price.toLocaleString('ru-RU')} ₸` : '-'}
+                    <Text fw={500} size="sm" style={{ color: "#1B2E3D" }}>
+                      {order.clientName || "Без имени"}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {order.clientPhone || "Нет телефона"}
                     </Text>
                   </Table.Td>
-                  
-                  {/* Действия (Редактировать / Удалить) */}
-                  <Table.Td style={{ textAlign: 'right' }}>
+
+                  <Table.Td>
+                    <Text size="sm" lineClamp={2} maw={250}>
+                      {order.description || "Нет описания"}
+                    </Text>
+                  </Table.Td>
+
+                  <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
+
+                  <Table.Td>
+                    <Text fw={700} size="sm" style={{ color: "#1B2E3D" }}>
+                      {order.price
+                        ? `${order.price.toLocaleString("ru-RU")} ₸`
+                        : "Не указана"}
+                    </Text>
+                  </Table.Td>
+
+                  <Table.Td style={{ textAlign: "right" }}>
                     <Group gap="xs" justify="flex-end">
-                      <Tooltip label="Редактировать">
-                        <ActionIcon variant="light" color="blue">
+                      <Tooltip label="Управление финансами и статусом">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          onClick={() => handleEditClick(order)}
+                        >
                           <IconEdit size={16} stroke={1.5} />
                         </ActionIcon>
                       </Tooltip>
                       <Tooltip label="Удалить">
-                        <ActionIcon variant="light" color="red">
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          onClick={() => handleDeleteOrder(order.id)}
+                        >
                           <IconTrash size={16} stroke={1.5} />
                         </ActionIcon>
                       </Tooltip>
@@ -204,17 +416,250 @@ export default function Orders() {
             </Table.Tbody>
           </Table>
         ) : (
-          // Заглушка, если база пустая
-          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-            <Text size="lg" fw={500} style={{ color: '#1B2E3D' }}>
+          <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
+            <Text size="lg" fw={500} style={{ color: "#1B2E3D" }}>
               Заказов пока нет
             </Text>
             <Text c="dimmed" mt={5}>
-              Нажмите «Новый заказ», чтобы добавить первую запись.
+              Ожидайте новые заявки с сайта.
             </Text>
-          </div>
+          </Center>
         )}
       </Paper>
+
+      {/* ========================================== */}
+      {/* МОДАЛЬНОЕ ОКНО: ФИНАНСЫ И СТАТУС ЗАКАЗА */}
+      {/* ========================================== */}
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={
+          <Title order={3} style={{ color: "#1B2E3D" }}>
+            Финансы заказа
+          </Title>
+        }
+        size="xl"
+        centered
+        overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
+      >
+        {editingOrder && (
+          <form onSubmit={handleUpdateOrder}>
+            <Stack gap="md">
+              {/* БЛОК 1: ИНФОРМАЦИЯ */}
+              <Paper p="md" radius="md" bg="#f8f9fa" withBorder>
+                <Grid>
+                  <Grid.Col span={6}>
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                      Клиент
+                    </Text>
+                    <Text fw={600}>
+                      {editingOrder.clientName || "Не указано"}
+                    </Text>
+                    <Text size="sm">{editingOrder.clientPhone}</Text>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                      Описание от клиента
+                    </Text>
+                    <Text size="sm" lineClamp={3}>
+                      {editingOrder.description}
+                    </Text>
+                  </Grid.Col>
+                </Grid>
+              </Paper>
+
+              <Divider />
+
+              {/* БЛОК 2: СТАТУС И ВЫРУЧКА */}
+              <Grid>
+                <Grid.Col span={6}>
+                  <Select
+                    label="Статус выполнения"
+                    data={[
+                      { value: "NEW", label: "Новый (Не обработан)" },
+                      {
+                        value: "PENDING",
+                        label: "В работе (Замер / Производство)",
+                      },
+                      { value: "COMPLETED", label: "Выполнен (Оплачен)" },
+                      { value: "CANCELED", label: "Отменен (Отказ)" },
+                    ]}
+                    required
+                    value={status}
+                    onChange={setStatus}
+                    styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
+                  />
+                </Grid.Col>
+                <Grid.Col span={6}>
+                  <NumberInput
+                    label="Итоговая выручка (₸)"
+                    description="Окончательная цена для клиента"
+                    required
+                    min={0}
+                    step={1000}
+                    value={price}
+                    onChange={setPrice}
+                    styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
+                  />
+                </Grid.Col>
+              </Grid>
+
+              <Divider
+                label={
+                  <Text fw={600} style={{ color: "#1B2E3D" }}>
+                    <IconReceipt
+                      size={14}
+                      style={{ verticalAlign: "middle", marginRight: 5 }}
+                    />
+                    Расходы по заказу (Себестоимость)
+                  </Text>
+                }
+                labelPosition="center"
+                my="sm"
+              />
+
+              {/* БЛОК 3: ДОБАВЛЕНИЕ РАСХОДОВ */}
+              <Paper p="md" radius="md" withBorder bg="white">
+                <Grid align="flex-end">
+                  <Grid.Col span={3}>
+                    <Select
+                      label="Категория"
+                      data={[
+                        "Материалы",
+                        "Монтаж/Подрядчики",
+                        "Доставка/Логистика",
+                        "Зарплата",
+                        "Прочее",
+                      ]}
+                      value={expenseCategory}
+                      onChange={setExpenseCategory}
+                    />
+                  </Grid.Col>
+                  <Grid.Col span={3}>
+                    <NumberInput
+                      label="Сумма (₸)"
+                      min={0}
+                      step={500}
+                      value={expenseAmount}
+                      onChange={setExpenseAmount}
+                    />
+                  </Grid.Col>
+                  <Grid.Col span={4}>
+                    <TextInput
+                      label="Комментарий"
+                      placeholder="Например: Покупка акрила"
+                      value={expenseComment}
+                      onChange={(e) => setExpenseComment(e.currentTarget.value)}
+                    />
+                  </Grid.Col>
+                  <Grid.Col span={2}>
+                    <Button
+                      fullWidth
+                      variant="light"
+                      color="blue"
+                      onClick={handleAddExpense}
+                      disabled={expenseAmount <= 0}
+                    >
+                      Добавить
+                    </Button>
+                  </Grid.Col>
+                </Grid>
+
+                {/* СПИСОК ДОБАВЛЕННЫХ РАСХОДОВ */}
+                {orderExpenses.length > 0 && (
+                  <Table mt="md" verticalSpacing="sm" striped>
+                    <Table.Tbody>
+                      {orderExpenses.map((exp) => (
+                        <Table.Tr key={exp.id}>
+                          <Table.Td w={150}>
+                            <Badge color="gray" variant="light">
+                              {exp.category}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">{exp.comment}</Text>
+                          </Table.Td>
+                          <Table.Td ta="right">
+                            <Text fw={600} color="red">
+                              -{exp.amount.toLocaleString("ru-RU")} ₸
+                            </Text>
+                          </Table.Td>
+                          <Table.Td w={50} ta="right">
+                            <ActionIcon
+                              color="red"
+                              variant="subtle"
+                              onClick={() => handleRemoveExpense(exp.id)}
+                            >
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                )}
+              </Paper>
+
+              {/* БЛОК 4: ФИНАНСОВАЯ СВОДКА (ПРИБЫЛЬ) */}
+              <Paper p="md" radius="md" bg="#1B2E3D" mt="sm">
+                <Group justify="space-between" align="center">
+                  <Group gap="sm">
+                    <ThemeIcon
+                      size={40}
+                      radius="md"
+                      color="rgba(255,255,255,0.1)"
+                      variant="filled"
+                    >
+                      <IconCalculator size={20} color="white" />
+                    </ThemeIcon>
+                    <div>
+                      <Text
+                        size="xs"
+                        style={{ color: "rgba(255,255,255,0.6)" }}
+                        tt="uppercase"
+                      >
+                        Чистая прибыль
+                      </Text>
+                      <Text
+                        size="xl"
+                        fw={700}
+                        style={{
+                          color: netProfit >= 0 ? "#40c057" : "#fa5252",
+                        }}
+                      >
+                        {netProfit > 0 ? "+" : ""}
+                        {netProfit.toLocaleString("ru-RU")} ₸
+                      </Text>
+                    </div>
+                  </Group>
+
+                  <Stack gap={0} align="flex-end">
+                    <Text size="sm" style={{ color: "white" }}>
+                      Выручка: {price.toLocaleString()} ₸
+                    </Text>
+                    <Text size="sm" style={{ color: "#fa5252" }}>
+                      Расходы: -{totalExpenses.toLocaleString()} ₸
+                    </Text>
+                  </Stack>
+                </Group>
+              </Paper>
+
+              <Group justify="flex-end" mt="md">
+                <Button variant="default" onClick={close}>
+                  Отмена
+                </Button>
+                <Button
+                  type="submit"
+                  loading={isSubmitting}
+                  style={{ backgroundColor: "#1B2E3D" }}
+                >
+                  Сохранить всё
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }

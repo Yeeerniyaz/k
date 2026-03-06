@@ -3,7 +3,7 @@ import { AppShell, Burger, Group, Title, NavLink, Button, Text, Center, Image } 
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconDashboard, IconPhoto, IconShoppingCart, IconUsers, 
-  IconLogout, IconReportMoney 
+  IconLogout, IconReportMoney, IconWallet, IconSettings
 } from '@tabler/icons-react';
 
 // ==========================================
@@ -16,7 +16,9 @@ import Orders from './pages/Orders.jsx';
 import Portfolio from './pages/Portfolio.jsx';
 import Users from './pages/Users.jsx';
 import Category from './pages/Category.jsx';
-import Prices from './pages/Prices.jsx'; // 🔥 Новый модуль управления ценами
+import Prices from './pages/Prices.jsx'; 
+import Finance from './pages/Finance.jsx';
+import CalculatorSettings from './pages/CalculatorSettings.jsx'; // 🔥 Подключили конструктор калькулятора
 
 // ==========================================
 // СЕНЬОРСКАЯ АРХИТЕКТУРА: ИЗОЛИРОВАННАЯ АДМИНКА
@@ -87,12 +89,28 @@ const AdminLayout = () => {
           active={location.pathname === '/admin/orders'} 
         />
         <NavLink 
+          label="Финансы" 
+          leftSection={<IconWallet size="1.1rem" stroke={1.5} />} 
+          onClick={() => { navigate('/admin/finance'); toggle(); }} 
+          color="royalBlue" 
+          variant="light" 
+          active={location.pathname === '/admin/finance'} 
+        />
+        <NavLink 
           label="Прайс-лист" 
           leftSection={<IconReportMoney size="1.1rem" stroke={1.5} />} 
           onClick={() => { navigate('/admin/prices'); toggle(); }} 
           color="royalBlue" 
           variant="light" 
           active={location.pathname === '/admin/prices'} 
+        />
+        <NavLink 
+          label="Калькулятор" 
+          leftSection={<IconSettings size="1.1rem" stroke={1.5} />} 
+          onClick={() => { navigate('/admin/calculator-settings'); toggle(); }} 
+          color="royalBlue" 
+          variant="light" 
+          active={location.pathname === '/admin/calculator-settings'} 
         />
         <NavLink 
           label="Портфолио" 
@@ -119,7 +137,9 @@ const AdminLayout = () => {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/finance" element={<Finance />} />
           <Route path="/prices" element={<Prices />} />
+          <Route path="/calculator-settings" element={<CalculatorSettings />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/users" element={<Users />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />

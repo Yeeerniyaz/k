@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import {
   Title, Text, Paper, Table, Button, Group, ActionIcon, 
   Skeleton, Alert, Tooltip, Modal, TextInput, PasswordInput, 
-  Select, Badge, Center, Stack
+  Select, Badge, Center, Stack, Divider
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconUserPlus, IconTrash, IconAlertCircle, IconRefresh, 
-  IconMail, IconLock, IconUser, IconShieldLock
+  IconMail, IconLock, IconUser, IconShieldLock, IconEdit
 } from '@tabler/icons-react';
 import api from '../api/index.js';
 
@@ -20,9 +20,11 @@ export default function Users() {
   const [error, setError] = useState(null);
 
   // ==========================================
-  // СОСТОЯНИЯ МОДАЛЬНОГО ОКНА (СОЗДАНИЕ ПОЛЬЗОВАТЕЛЯ)
+  // СОСТОЯНИЯ МОДАЛЬНОГО ОКНА (СОЗДАНИЕ / РЕДАКТИРОВАНИЕ)
   // ==========================================
   const [opened, { open, close }] = useDisclosure(false);
+  const [editingId, setEditingId] = useState(null); // Смарт-флаг: null = создание, ID = редактирование
+  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +39,7 @@ export default function Users() {
       setLoading(true);
       setError(null);
       const response = await api.get('/users');
-      setUsers(response.data.data || []);
+      setUsers(response.data.data || response.data || []);
     } catch (err) {
       console.error('Ошибка загрузки сотрудников:', err);
       // Умный фоллбэк: если бэкенд для пользователей еще не готов, покажем фейковые данные для теста UI
@@ -56,29 +58,72 @@ export default function Users() {
   }, []);
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ДОБАВЛЕНИЕ СОТРУДНИКА
+  // БИЗНЕС-ЛОГИКА: ОТКРЫТИЕ МОДАЛКИ
   // ==========================================
-  const handleCreateUser = async (e) => {
+  const handleOpenModal = (user = null) => {
+    if (user) {
+      // Режим редактирования
+      setEditingId(user.id);
+      setName(user.name || '');
+      setEmail(user.email || '');
+      setRole(user.role || 'MANAGER');
+      setPassword(''); // Специально оставляем пустым для безопасности
+    } else {
+      // Режим создания
+      setEditingId(null);
+      setName('');
+      setEmail('');
+      setRole('MANAGER');
+      setPassword('');
+    }
+    open();
+  };
+
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ (СОЗДАНИЕ/ОБНОВЛЕНИЕ)
+  // ==========================================
+  const handleSaveUser = async (e) => {
     e.preventDefault();
-    if (!name || !email || !password || !role) return;
+    // Базовая валидация (пароль обязателен только при создании)
+    if (!name || !email || !role) return;
+    if (!editingId && !password) {
+      alert('При создании нового сотрудника необходимо задать пароль.');
+      return;
+    }
 
     setIsSubmitting(true);
     
+    // Формируем payload. Пароль добавляем только если он был изменен или задан
+    const payload = { name, email, role };
+    if (password.trim() !== '') {
+      payload.password = password;
+    }
+
     try {
-      await api.post('/users', { name, email, password, role });
+      if (editingId) {
+        // Обновляем существующего (смена пароля или данных)
+        await api.put(`/users/${editingId}`, payload);
+      } else {
+        // Создаем нового
+        await api.post('/users', payload);
+      }
       
-      // Очищаем форму
-      setName('');
-      setEmail('');
-      setPassword('');
-      setRole('MANAGER');
       close();
-      
-      // Перезапрашиваем актуальный список
-      fetchUsers();
+      fetchUsers(); // Обновляем таблицу
     } catch (err) {
-      console.error('Ошибка при создании пользователя:', err);
-      alert(err.response?.data?.message || 'Ошибка при создании сотрудника. Возможно, такой email уже существует.');
+      console.error('Ошибка при сохранении пользователя:', err);
+      
+      // Сеньорская заглушка для демо-режима
+      if (error) {
+        if (editingId) {
+          setUsers(prev => prev.map(u => u.id === editingId ? { ...u, ...payload } : u));
+        } else {
+          setUsers(prev => [...prev, { id: Date.now().toString(), ...payload, createdAt: new Date().toISOString() }]);
+        }
+        close();
+      } else {
+        alert(err.response?.data?.message || 'Ошибка при сохранении профиля сотрудника. Возможно, email занят.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -97,11 +142,14 @@ export default function Users() {
     
     try {
       await api.delete(`/users/${id}`);
-      // Оптимистичное удаление из стейта
       setUsers(prev => prev.filter(user => user.id !== id));
     } catch (err) {
       console.error('Ошибка при удалении:', err);
-      alert('Не удалось удалить сотрудника.');
+      if (error) {
+        setUsers(prev => prev.filter(user => user.id !== id)); // Демо-удаление
+      } else {
+        alert('Не удалось удалить сотрудника.');
+      }
     }
   };
 
@@ -135,7 +183,7 @@ export default function Users() {
           
           <Button 
             leftSection={<IconUserPlus size={16} />} 
-            onClick={open}
+            onClick={() => handleOpenModal()}
             style={{ backgroundColor: '#1B2E3D', color: 'white', fontWeight: 600 }}
           >
             Добавить сотрудника
@@ -144,7 +192,7 @@ export default function Users() {
       </Group>
 
       {error && (
-        <Alert icon={<IconAlertCircle size={16} />} title="Внимание" color="orange" mb="xl" radius="md">
+        <Alert icon={<IconAlertCircle size={16} />} title="Внимание (Режим разработки)" color="orange" mb="xl" radius="md">
           {error}
         </Alert>
       )}
@@ -204,13 +252,23 @@ export default function Users() {
                   
                   {/* Действия */}
                   <Table.Td style={{ textAlign: 'right' }}>
-                    {user.role !== 'ADMIN' && (
-                      <Tooltip label="Удалить доступ">
-                        <ActionIcon variant="light" color="red" onClick={() => handleDeleteUser(user.id, user.role)}>
-                          <IconTrash size={16} stroke={1.5} />
+                    <Group gap="xs" justify="flex-end">
+                      {/* КНОПКА РЕДАКТИРОВАНИЯ - ТЕПЕРЬ ЕСТЬ У ВСЕХ */}
+                      <Tooltip label="Редактировать профиль и пароль">
+                        <ActionIcon variant="light" color="blue" onClick={() => handleOpenModal(user)}>
+                          <IconEdit size={16} stroke={1.5} />
                         </ActionIcon>
                       </Tooltip>
-                    )}
+                      
+                      {/* УДАЛЕНИЕ ДОСТУПНО ТОЛЬКО ДЛЯ МЕНЕДЖЕРОВ */}
+                      {user.role !== 'ADMIN' && (
+                        <Tooltip label="Удалить доступ">
+                          <ActionIcon variant="light" color="red" onClick={() => handleDeleteUser(user.id, user.role)}>
+                            <IconTrash size={16} stroke={1.5} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -226,17 +284,17 @@ export default function Users() {
       </Paper>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО: ДОБАВИТЬ СОТРУДНИКА */}
+      {/* МОДАЛЬНОЕ ОКНО: ДОБАВИТЬ / ИЗМЕНИТЬ СОТРУДНИКА */}
       {/* ========================================== */}
       <Modal 
         opened={opened} 
         onClose={close} 
-        title={<Title order={3} style={{ color: '#1B2E3D' }}>Добавить сотрудника</Title>}
+        title={<Title order={3} style={{ color: '#1B2E3D' }}>{editingId ? 'Редактировать профиль' : 'Добавить сотрудника'}</Title>}
         size="md"
         centered
         overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
       >
-        <form onSubmit={handleCreateUser}>
+        <form onSubmit={handleSaveUser}>
           <Stack gap="md">
             <TextInput
               label="ФИО сотрудника"
@@ -259,16 +317,6 @@ export default function Users() {
               styles={{ label: { color: '#1B2E3D', fontWeight: 600 } }}
             />
 
-            <PasswordInput
-              label="Пароль"
-              placeholder="Задайте надежный пароль"
-              required
-              leftSection={<IconLock size={16} color="#1B2E3D" />}
-              value={password}
-              onChange={(e) => setPassword(e.currentTarget.value)}
-              styles={{ label: { color: '#1B2E3D', fontWeight: 600 } }}
-            />
-
             <Select
               label="Роль в системе"
               data={[
@@ -281,10 +329,23 @@ export default function Users() {
               styles={{ label: { color: '#1B2E3D', fontWeight: 600 } }}
             />
 
+            <Divider my="xs" label="Смена пароля" labelPosition="center" />
+
+            <PasswordInput
+              label={editingId ? "Новый пароль" : "Пароль"}
+              placeholder={editingId ? "Оставьте пустым, чтобы не менять" : "Задайте надежный пароль"}
+              required={!editingId} // Обязательно только при создании
+              leftSection={<IconLock size={16} color="#1B2E3D" />}
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+              styles={{ label: { color: '#1B2E3D', fontWeight: 600 } }}
+              description={editingId ? "Впишите новый пароль, если сотрудник его забыл." : ""}
+            />
+
             <Group justify="flex-end" mt="xl">
               <Button variant="default" onClick={close}>Отмена</Button>
               <Button type="submit" loading={isSubmitting} style={{ backgroundColor: '#1B2E3D' }}>
-                Создать аккаунт
+                {editingId ? 'Сохранить изменения' : 'Создать аккаунт'}
               </Button>
             </Group>
           </Stack>
