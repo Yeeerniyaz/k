@@ -75,7 +75,7 @@ app.use('/api/finance', financeRoutes);
 // ОБРАБОТКА ОШИБОК (ERROR HANDLING)
 // ==========================================
 
-/
+
 const clientBuildPath = path.join(__dirname, '../client/dist');
 
 // Говорим Express раздавать статические файлы из этой папки
