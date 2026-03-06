@@ -1,13 +1,19 @@
-// Подключаем PostgreSQL
+// ==========================================
+// ЯДРО БАЗЫ ДАННЫХ ROYAL BANNERS (ERP & CRM)
+// ==========================================
+
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" // Оставляем твой PostgreSQL
+  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// 1. Пользователи (Админ, Менеджеры, постоянные B2B клиенты)
+// ==========================================
+// 1. ПОЛЬЗОВАТЕЛИ (Админ, Менеджеры, постоянные B2B клиенты)
+// ==========================================
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -20,23 +26,30 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-// 2. Портфолио (То, что босс добавляет с телефона, кейсы из Instagram)
+// ==========================================
+// 2. ПОРТФОЛИО (То, что босс добавляет с телефона, кейсы из Instagram)
+// ==========================================
 model Portfolio {
   id          String   @id @default(uuid())
   title       String   // "Вывеска для GLOBAL DENT"
   category    ServiceCategory // "BANNERS", "METAL_FRAMES" и т.д.
   imageUrl    String   // Ссылка на фото
+  publicId    String?  // ДОБАВЛЕНО: ID для правильного удаления картинки из облака (Cloudinary)
   description String?
   isVisible   Boolean  @default(true) // Можно временно скрыть
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-// 3. Заказы (Падают с калькулятора в CRM)
+// ==========================================
+// 3. ЗАКАЗЫ (Падают с калькулятора в CRM)
+// ==========================================
 model Order {
   id          String      @id @default(uuid())
+  
   client      User?       @relation(fields: [clientId], references: [id])
   clientId    String?     // Может быть null, если заказ от гостя без регистрации
+
   customerName String     // Имя заказчика (особенно если без регистрации)
   phone       String      // Обязательно для связи
   
@@ -48,14 +61,59 @@ model Order {
   hasEyelets  Boolean     @default(false) // Люверсы
   needsMount  Boolean     @default(false) // Нужен монтаж
   
+  // ДОБАВЛЕНО: Текстовое поле для сохранения сложных деталей из смарт-калькулятора (надбавки, опции)
+  description String?     
+  
   totalPrice  Int         // Итоговая цена в тенге
   status      OrderStatus @default(NEW)
+  
+  // ДОБАВЛЕНО: Связь 1-ко-многим. Расходы, привязанные к этому заказу (себестоимость)
+  expenses    Expense[]   
   
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }
 
-// Перечисления для строгой типизации
+// ==========================================
+// 4. НАСТРОЙКИ КАЛЬКУЛЯТОРА И СИСТЕМЫ (JSON) -> НОВЫЙ МОДУЛЬ
+// ==========================================
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique // Например: "calculator_config"
+  value     Json     // Сюда будет сохраняться вся сложная архитектура (формулы, инпуты)
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// 5. ПРАЙС-ЛИСТ (БАЗОВЫЕ ЦЕНЫ ДЛЯ КАЛЬКУЛЯТОРА) -> НОВЫЙ МОДУЛЬ
+// ==========================================
+model Price {
+  id        String   @id @default(uuid())
+  service   String   @unique // Например: "Печать баннера 340гр"
+  unit      String   // "1 кв.м"
+  price     Int      // Стоимость в тенге
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// 6. ФИНАНСЫ (ОБЩИЕ РАСХОДЫ И РАСХОДЫ ПО ЗАКАЗАМ) -> НОВЫЙ МОДУЛЬ
+// ==========================================
+model Expense {
+  id        String   @id @default(uuid())
+  category  String   // "Материалы", "Аренда цеха", "Зарплата", "Таргет"
+  amount    Int      // Сумма расхода
+  comment   String?
+  date      DateTime @default(now())
+  
+  // Если расход привязан к конкретному заказу, он связывается здесь
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// ПЕРЕЧИСЛЕНИЯ ДЛЯ СТРОГОЙ ТИПИЗАЦИИ
+// ==========================================
 enum Role {
   ADMIN
   MANAGER
@@ -64,16 +122,21 @@ enum Role {
 
 enum OrderStatus {
   NEW         // Только упала заявка
+  PENDING     // ДОБАВЛЕНО: В ожидании / на согласовании (замер)
   IN_PROGRESS // В производстве
   READY       // Ждет отгрузки/монтажа
   COMPLETED   // Закрыт и оплачен
+  CANCELED    // ДОБАВЛЕНО: Отменен
 }
 
 // Категории услуг (взяты из реального прайса/инсты)
 enum ServiceCategory {
   BANNERS         // Баннеры, наружная реклама
+  LIGHTBOXES      // ДОБАВЛЕНО: Лайтбоксы
+  SIGNBOARDS      // ДОБАВЛЕНО: Вывески
   INTERIOR        // Оформление интерьера и экстерьера
   FIGURES_3D      // Объемные фигуры
   METAL_FRAMES    // Металлокаркасы
+  POS_MATERIALS   // ДОБАВЛЕНО: ПОС материалы
   DESIGN_PRINT    // Дизайн и печать
 }
