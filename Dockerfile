@@ -25,26 +25,25 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 
 WORKDIR /app
 
-# СЕНЬОРСКИЙ ШАГ 1: Копируем конфиги бэкенда
+# Шаг 1: Копируем конфиги бэкенда
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
-# СЕНЬОРСКИЙ ШАГ 2: Устанавливаем ВСЕ зависимости (пока без флага production),
-# чтобы установился CLI-инструмент prisma
+# Шаг 2: Устанавливаем ВСЕ зависимости (пока без флага production),
+# чтобы установился CLI-инструмент prisma из devDependencies
 RUN npm install
 
-# СЕНЬОРСКИЙ ШАГ 3: Генерируем клиент Prisma
+# Шаг 3: Генерируем клиент Prisma
 RUN npx prisma generate
 
-# СЕНЬОРСКИЙ ШАГ 4: ТОЛЬКО ТЕПЕРЬ включаем production режим,
-# чтобы бэкенд и Express.js работали максимально быстро
+# Шаг 4: ТОЛЬКО ТЕПЕРЬ включаем production режим!
 ENV NODE_ENV=production
 
-# Копируем исходный код бэкенда (исправлен перенос строки)
+# Шаг 5: Копируем исходный код бэкенда (в одну строку!)
 COPY . .
 
-# Копируем ГОТОВУЮ папку dist из первого этапа!
-# Теперь нашему src/app.js будет что раздавать пользователям.
+# Шаг 6: Копируем ГОТОВУЮ папку dist из первого этапа
 COPY --from=frontend-builder /build/client/dist ./client/dist
 
 # Сообщаем, что контейнер будет слушать 5005 порт
