@@ -1,29 +1,44 @@
-# Тек іске қосуға арналған жеңіл образ
+# ==========================================
+# ЭТАП 1: СБОРКА ФРОНТЕНДА (REACT + MANTINE)
+# ==========================================
+FROM node:22-slim AS frontend-builder
+
+WORKDIR /build/client
+
+# Копируем конфиги и ставим зависимости
+COPY client/package*.json ./
+RUN npm install
+
+# Собираем фронтенд (Vite создаст папку dist)
+COPY client/ ./
+RUN npm run build
+
+# ==========================================
+# ЭТАП 2: ФИНАЛЬНЫЙ ОБРАЗ БЭКЕНДА (PRODUCTION)
+# ==========================================
 FROM node:22-slim
 
-# OpenSSL міндетті түрде керек (Prisma үшін)
+# OpenSSL Prisma үшін міндетті
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 1. Тек қажетті файлдарды көшіреміз (ноутта жиналған node_modules қоса)
-# Ескерту: Егер ноут Windows болса, node_modules-ті көшіру қауіпті болуы мүмкін.
-# Сондықтан біз тек package.json мен prisma-ны көшіріп, инсталлды серверде жасаймыз,
-# бірақ ЕШҚАНДАЙ BUILD жасатпаймыз.
+# 1. Бэкенд конфигтерін көшіру
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Серверде тек қажетті пакеттерді тез орнату
-RUN npm install --omit=dev
+# 2. БАРЛЫҚ тәуелділіктерді орнату (Prisma CLI үшін devDeps керек)
+RUN npm install
 
-# 2. Ноутта жиналған фронтендті көшіру
-COPY client/dist ./client/dist
-
-# 3. Қалған бэкенд кодын көшіру
-COPY . .
-
-# 4. Присманы генерация жасау (бірақ бұл жолы ол өте жеңіл өтеді)
+# 3. Присма клиентін генерация жасау (енді қате шықпайды)
 RUN npx prisma generate
+
+# 4. ЕНДІ ҒАНА продакшн режимді қосамыз
+ENV NODE_ENV=production
+
+# 5. Исходный код пен жиналған фронтендті көшіру
+COPY . .
+COPY --from=frontend-builder /build/client/dist ./client/dist
 
 EXPOSE 5005
 
