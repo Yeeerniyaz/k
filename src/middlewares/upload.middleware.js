@@ -1,25 +1,42 @@
 import multer from 'multer';
+import path from 'path';
 
-// 1. Настройка хранилища
-// Мы используем memoryStorage, чтобы файл сохранялся в оперативную память (Buffer).
-const multerStorage = multer.memoryStorage();
+// ==========================================
+// 1. КОНФИГУРАЦИЯ ХРАНИЛИЩА (STORAGE)
+// ==========================================
+// Мы используем memoryStorage, чтобы не засорять диск сервера временными файлами.
+// Файл будет доступен в req.file.buffer для последующей отправки в Cloudinary.
+const storage = multer.memoryStorage();
 
-// 2. Фильтрация файлов
-// Проверяем mimetype, чтобы убедиться, что пользователь грузит именно картинку
-const multerFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
+// ==========================================
+// 2. ФИЛЬТР ФАЙЛОВ (FILE FILTER)
+// ==========================================
+// Сеньорский подход: принимаем ТОЛЬКО изображения. Никаких скриптов или PDF.
+const fileFilter = (req, file, cb) => {
+    // Допустимые расширения
+    const filetypes = /jpeg|jpg|png|webp/;
+    // Проверка расширения
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    // Проверка MIME-типа
+    const mimetype = filetypes.test(file.mimetype);
+
+    if (extname && mimetype) {
+        return cb(null, true);
     } else {
-        cb(new Error('Разрешена загрузка только изображений (JPG, PNG, WEBP)'), false);
+        cb(new Error('Ошибка: Разрешены только изображения (jpeg, jpg, png, webp)!'), false);
     }
 };
 
-// 3. Экспорт Middleware
-// 🔥 ИМЕННО ЭТОТ ЭКСПОРТ ИЩЕТ ТВОЙ ROUTER: export const uploadPhoto
-export const uploadPhoto = multer({
-    storage: multerStorage,
-    fileFilter: multerFilter,
-    limits: { 
-        fileSize: 10 * 1024 * 1024 // 10 МБ 
-    }
+// ==========================================
+// 3. ИНИЦИАЛИЗАЦИЯ MULTER
+// ==========================================
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // Лимит: 5MB (достаточно для баннеров высокого качества)
+    },
+    fileFilter: fileFilter
 });
+
+// 🔥 ВОТ ОНО: Экспортируем по дефолту, чтобы SyntaxError исчезла
+export default upload;
