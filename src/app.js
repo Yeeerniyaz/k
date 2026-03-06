@@ -2,85 +2,93 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import path from 'path'; // 🔥 НОВОЕ: Для работы с путями папок
-import { fileURLToPath } from 'url'; // 🔥 НОВОЕ: Для правильного __dirname в модулях ESM
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// --- ИМПОРТЫ МАРШРУТОВ API ---
-import orderRoutes from './routes/order.routes.js';
-import portfolioRoutes from './routes/portfolio.routes.js';
+// --- ИМПОРТ МАРШРУТОВ (ROUTES) ---
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
+import orderRoutes from './routes/order.routes.js';
+import priceRoutes from './routes/price.routes.js';
+import portfolioRoutes from './routes/portfolio.routes.js';
+import financeRoutes from './routes/finance.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 
-import { errorHandler } from './middlewares/error.middleware.js';
-
-// 🔥 Настройка путей для ESM (так как мы используем import, а не require)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
 // ==========================================
-// 1. БАЗОВЫЕ MIDDLEWARE
+// 1. ГЛОБАЛЬНЫЕ MIDDLEWARES
 // ==========================================
 app.use(helmet({
-    // Отключаем жесткий CSP, чтобы React мог грузить свои скрипты и картинки с Cloudinary
-    contentSecurityPolicy: false, 
+    crossOriginResourcePolicy: false,
 }));
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+app.use(cors({
+    origin: '*', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
+
 app.use(morgan('dev'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Статические файлы бэкенда (загруженные картинки)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ==========================================
-// 2. HEALTHCHECK (ПРОВЕРКА ЖИЗНЕСПОСОБНОСТИ API)
+// 2. API ROUTES (БЭКЕНД ЛОГИКАСЫ)
 // ==========================================
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        status: 'success',
-        message: 'Royal Banners API is running smoothly'
-    });
-});
-
-// ==========================================
-// 3. ПОДКЛЮЧЕНИЕ РОУТОВ (API ENDPOINTS)
-// ==========================================
-app.use('/api/orders', orderRoutes);
-app.use('/api/portfolio', portfolioRoutes);
+// ВАЖНО: Все API маршруты должны идти ПЕРЕД раздачей фронтенда
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/prices', priceRoutes);
+app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/finance', financeRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-// ==========================================
-// 4. ОБРАБОТЧИК ОШИБОК ДЛЯ API (404)
-// ==========================================
-// 🔥 ВАЖНО: Если запрос шел именно к API, но маршрута нет — отдаем JSON ошибку.
-app.all('/api/*', (req, res) => {
-    res.status(404).json({
-        status: 'error',
-        message: `API маршрут ${req.originalUrl} не найден`
-    });
+// Тестовый эндпоинт
+app.get('/api/status', (req, res) => {
+    res.json({ message: 'Royal Banners API is running smoothly 🚀', version: '2.0.0' });
 });
 
 // ==========================================
-// 5. 🔥 РАЗДАЧА ФРОНТЕНДА (REACT CLIENT)
+// 3. 🔥 РАЗДАЧА ФРОНТЕНДА (REACT CLIENT)
 // ==========================================
-// Указываем путь к будущей папке dist (куда Vite будет собирать фронтенд).
-// Предполагается, что папка client будет лежать в корне проекта рядом с src
+// Senior-стандарт: Фронтендті тарату бөлімі
 const clientBuildPath = path.join(__dirname, '../client/dist');
 
-// Говорим Express раздавать статические файлы (JS, CSS, картинки) из этой папки
+// Статикалық файлдарды (js, css) клиент папкасынан оқимыз
 app.use(express.static(clientBuildPath));
 
-// Для ЛЮБОГО другого запроса (например, когда пользователь обновляет страницу /portfolio на фронтенде),
-// мы отдаем главный файл React — index.html. Всю остальную маршрутизацию возьмет на себя React Router.
+// Кез келген басқа сұранысқа (API-ге жатпайтын) index.html-ді қайтарамыз.
+// Бұл React Router-дің браузерде дұрыс жұмыс істеуі үшін қажет.
 app.get('*', (req, res) => {
+    // Егер сұраныс /api-мен басталса, бірақ ол маршрут табылмаса - бұл 404
+    if (req.url.startsWith('/api')) {
+        return res.status(404).json({ status: 'error', message: 'API эндпоинт не найден' });
+    }
+    // Қалған жағдайда фронтендті береміз
     res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 
 // ==========================================
-// 6. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК (ENTERPRISE GRADE)
+// 4. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК
 // ==========================================
-app.use(errorHandler);
+app.use((err, req, res, next) => {
+    err.statusCode = err.statusCode || 500;
+    console.error('🔥 SERVER ERROR:', err);
+
+    res.status(err.statusCode).json({
+        status: 'error',
+        message: err.message || 'Внутренняя ошибка сервера',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
 
 export default app;
