@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { getDashboardStats } from '../controllers/analytics.controller.js';
-// 🔥 ИМПОРТ: Подключаем охранников нашего API для защиты коммерческой тайны
-import { protect, restrictTo } from '../middlewares/auth.middleware.js';
+
+// 🔥 ИСПРАВЛЕНИЕ: Используем 'authorize' вместо 'restrictTo', 
+// чтобы соответствовать экспортам из auth.middleware.js
+import { protect, authorize } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -10,13 +12,15 @@ const router = Router();
 // ==========================================
 
 // Маршрут: GET /api/analytics/dashboard
-// Описание: Получить агрегированную статистику (выручка, статусы, последние заказы) для главного экрана
+// Описание: Получить агрегированную статистику (выручка, статусы, последние заказы) 
+// для главного экрана Dashboard.
 // Доступ: СТРОГО ЗАЩИЩЕННЫЙ (Только для ADMIN и MANAGER)
+
 router.get(
     '/dashboard',
-    protect,
-    restrictTo('ADMIN', 'MANAGER'),
-    getDashboardStats
+    protect, // Проверка, что пользователь вошел в систему
+    authorize('ADMIN', 'MANAGER'), // Проверка, что у пользователя есть права доступа
+    getDashboardStats // Выполнение самой логики сбора данных
 );
 
 export default router;
