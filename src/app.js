@@ -49,9 +49,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // ==========================================
 
 // Приветственный маршрут для проверки работоспособности API
-app.get('/', (req, res) => {
-    res.json({ message: 'Royal Banners API is running smoothly 🚀', version: '2.0.0' });
-});
 
 // Авторизация (Вход)
 app.use('/api/auth', authRoutes);
