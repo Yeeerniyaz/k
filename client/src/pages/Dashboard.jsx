@@ -1,25 +1,32 @@
 import { useState, useEffect } from 'react';
 import {
-  Title, Text, Grid, Card, Group, ThemeIcon, Skeleton, Alert, Table, Badge, Paper, Divider, Box, Stack, Center // 🔥 Теперь тут есть и Stack, и Center!
+  Title, Text, Grid, Card, Group, ThemeIcon, Skeleton, Alert, Table, Badge, Paper, Divider, Box, Stack, Center, TextInput, Button, Progress, Tooltip // 🔥 Tooltip осында қосылды!
 } from '@mantine/core';
 import { 
-  IconCoin, IconShoppingCart, IconUsers, IconPhoto, IconAlertCircle,
-  IconTrendingUp, IconTrendingDown, IconWallet, IconBusinessplan, IconArrowUpRight
+  IconShoppingCart, IconUsers, IconPhoto, IconAlertCircle,
+  IconTrendingUp, IconTrendingDown, IconWallet, IconBusinessplan, 
+  IconCalendarEvent, IconFilter, IconReceipt2, IconBuildingSkyscraper
 } from '@tabler/icons-react';
 import api from '../api/index.js';
 
 export default function Dashboard() {
   // ==========================================
-  // СОСТОЯНИЯ
+  // СОСТОЯНИЯ ДАННЫХ
   // ==========================================
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Расширенная структура данных для финансового учета
+  // ФИЛЬТРЫ ПО ДАТЕ
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // Расширенная структура данных для детального финансового учета
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalRevenue: 0,
-    totalExpenses: 0, 
+    orderExpenses: 0,     // Расходы только по заказам (себестоимость)
+    companyExpenses: 0,   // Общие расходы фирмы (аренда, реклама)
+    totalExpenses: 0,     // Все расходы ВМЕСТЕ
     netProfit: 0,     
     totalUsers: 0,
     totalPortfolio: 0,
@@ -29,44 +36,56 @@ export default function Dashboard() {
   // ==========================================
   // ЗАГРУЗКА ДАННЫХ (API)
   // ==========================================
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/analytics');
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      // Передаем параметры даты в API
+      const response = await api.get('/analytics', {
+        params: { from: dateFrom, to: dateTo }
+      });
+      
+      if (response.data && response.data.data) {
+        const data = response.data.data;
+        const calcTotalExpenses = (data.orderExpenses || 0) + (data.companyExpenses || 0);
+        const profit = data.netProfit !== undefined ? data.netProfit : (data.totalRevenue || 0) - calcTotalExpenses;
         
-        if (response.data && response.data.data) {
-          const data = response.data.data;
-          const profit = data.netProfit !== undefined ? data.netProfit : (data.totalRevenue || 0) - (data.totalExpenses || 0);
-          
-          setStats(prev => ({ 
-            ...prev, 
-            ...data,
-            netProfit: profit
-          }));
-        }
-      } catch (err) {
-        console.error('Ошибка загрузки аналитики:', err);
-        // СЕНЬОРСКИЙ ФОЛЛБЭК: Идеальные тестовые данные, пока бэкенд в разработке
-        setStats({
-          totalOrders: 142,
-          totalRevenue: 5450000,
-          totalExpenses: 2150000, 
-          netProfit: 3300000,     
-          totalUsers: 4,
-          totalPortfolio: 28,
-          recentOrders: [
-            { id: 'ord-8f7a9', clientName: 'TOO Alpha Group', status: 'COMPLETED', price: 450000 },
-            { id: 'ord-2b3c4', clientName: 'Иван (Калькулятор)', status: 'PENDING', price: 120000 },
-            { id: 'ord-1a2b3', clientName: 'Салон Красоты', status: 'NEW', price: 85000 },
-          ]
-        });
-        setError('Работа в автономном режиме. Показана тестовая финансовая сводка.');
-      } finally {
-        setLoading(false);
+        setStats(prev => ({ 
+          ...prev, 
+          ...data,
+          totalExpenses: calcTotalExpenses,
+          netProfit: profit
+        }));
       }
-    };
+    } catch (err) {
+      console.error('Ошибка загрузки аналитики:', err);
+      // СЕНЬОРСКИЙ ФОЛЛБЭК: Продвинутые тестовые данные с учетом новых расходов
+      const mockOrderExpenses = 1150000;
+      const mockCompanyExpenses = 1000000;
+      const mockTotalExpenses = mockOrderExpenses + mockCompanyExpenses;
+      const mockRevenue = 5450000;
 
+      setStats({
+        totalOrders: 142,
+        totalRevenue: mockRevenue,
+        orderExpenses: mockOrderExpenses,
+        companyExpenses: mockCompanyExpenses,
+        totalExpenses: mockTotalExpenses,
+        netProfit: mockRevenue - mockTotalExpenses,     
+        totalUsers: 4,
+        totalPortfolio: 28,
+        recentOrders: [
+          { id: 'ord-8f7a9', clientName: 'TOO Alpha Group', status: 'COMPLETED', price: 450000, date: new Date().toISOString() },
+          { id: 'ord-2b3c4', clientName: 'Заявка с Калькулятора', status: 'PENDING', price: 120000, date: new Date().toISOString() },
+          { id: 'ord-1a2b3', clientName: 'Салон Красоты (Свяжитесь с нами)', status: 'NEW', price: 85000, date: new Date().toISOString() },
+        ]
+      });
+      setError('Работа в автономном режиме. Показана расширенная тестовая сводка.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAnalytics();
   }, []);
 
@@ -78,49 +97,95 @@ export default function Dashboard() {
       case 'COMPLETED': return <Badge color="green" variant="light">Выполнен</Badge>;
       case 'PENDING': return <Badge color="orange" variant="light">В работе</Badge>;
       case 'CANCELED': return <Badge color="red" variant="light">Отменен</Badge>;
-      case 'NEW': return <Badge color="blue" variant="light">Новый</Badge>;
+      case 'NEW': return <Badge color="blue" variant="light">Новый (Лид)</Badge>;
       default: return <Badge color="gray" variant="light">{status}</Badge>;
     }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('ru-RU');
   };
 
   // ==========================================
   // КОНФИГУРАЦИЯ КАРТОЧЕК
   // ==========================================
   const financialCards = [
-    { title: 'Общий оборот (Выручка)', value: stats.totalRevenue, icon: IconTrendingUp, color: 'teal', prefix: '+' },
-    { title: 'Общие расходы (Себестоимость)', value: stats.totalExpenses, icon: IconTrendingDown, color: 'red', prefix: '-' },
+    { title: 'Оборот (Выручка)', value: stats.totalRevenue, icon: IconTrendingUp, color: 'teal', prefix: '+' },
+    { title: 'Все Расходы (Вместе)', value: stats.totalExpenses, icon: IconTrendingDown, color: 'red', prefix: '-' },
     { title: 'Чистая прибыль', value: stats.netProfit, icon: IconWallet, color: 'royalBlue', prefix: stats.netProfit > 0 ? '+' : '' },
   ];
 
   const operationalCards = [
-    { title: 'Всего заказов', value: stats.totalOrders, icon: IconShoppingCart, color: 'indigo' },
+    { title: 'Всего лидов и заказов', value: stats.totalOrders, icon: IconShoppingCart, color: 'indigo' },
     { title: 'Сотрудники в системе', value: stats.totalUsers, icon: IconUsers, color: 'orange' },
     { title: 'Работ в портфолио', value: stats.totalPortfolio, icon: IconPhoto, color: 'grape' },
   ];
 
+  // Проценты для Progress Bar (структура расходов)
+  const orderExpPercent = stats.totalExpenses > 0 ? Math.round((stats.orderExpenses / stats.totalExpenses) * 100) : 0;
+  const companyExpPercent = stats.totalExpenses > 0 ? Math.round((stats.companyExpenses / stats.totalExpenses) * 100) : 0;
+
   return (
     <div style={{ fontFamily: '"Google Sans", sans-serif' }}>
-      <Title order={2} mb="xs" style={{ color: '#1B2E3D' }}>
-        Аналитика и Дашборд
-      </Title>
-      <Text c="dimmed" mb="xl">
-        Глобальные показатели бизнеса Royal Banners.
-      </Text>
+      <Group justify="space-between" align="flex-end" mb="xl">
+        <div>
+          <Title order={2} mb="xs" style={{ color: '#1B2E3D' }}>
+            Аналитика и Дашборд
+          </Title>
+          <Text c="dimmed">
+            Глобальные показатели бизнеса Royal Banners.
+          </Text>
+        </div>
+      </Group>
+
+      {/* ========================================== */}
+      {/* ФИЛЬТР ПО ПЕРИОДУ (ДАТЫ) */}
+      {/* ========================================== */}
+      <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
+        <Group justify="space-between" align="flex-end">
+          <Group align="flex-end">
+            <TextInput 
+              type="date" 
+              label="Период с" 
+              value={dateFrom} 
+              onChange={(e) => setDateFrom(e.currentTarget.value)} 
+              leftSection={<IconCalendarEvent size={16} />}
+            />
+            <TextInput 
+              type="date" 
+              label="Период по" 
+              value={dateTo} 
+              onChange={(e) => setDateTo(e.currentTarget.value)} 
+              leftSection={<IconCalendarEvent size={16} />}
+            />
+            <Button 
+              onClick={fetchAnalytics} 
+              leftSection={<IconFilter size={16} />}
+              style={{ backgroundColor: '#1B2E3D' }}
+            >
+              Показать данные
+            </Button>
+          </Group>
+          <Badge color="blue" variant="light" size="lg" radius="sm">
+            {dateFrom || dateTo ? 'Выбранный период' : 'За все время'}
+          </Badge>
+        </Group>
+      </Paper>
 
       {error && (
-        <Alert icon={<IconAlertCircle size={16} />} title="Режим разработки" color="orange" mb="xl" radius="md">
+        <Alert icon={<IconAlertCircle size={16} />} title="Инженерный режим" color="orange" mb="xl" radius="md">
           {error}
         </Alert>
       )}
 
       {/* ========================================== */}
-      {/* БЛОК 1: ФИНАНСОВАЯ СВОДКА */}
+      {/* БЛОК 1: ГЛАВНЫЕ ФИНАНСОВЫЕ КАРТОЧКИ */}
       {/* ========================================== */}
-      <Title order={4} mb="md" style={{ color: '#1B2E3D' }}>Финансовые показатели</Title>
-      <Grid mb="xl">
+      <Grid mb="lg">
         {financialCards.map((stat, index) => (
           <Grid.Col span={{ base: 12, md: 4 }} key={index}>
-            <Card withBorder padding="lg" radius="md" shadow="sm" style={{ borderTop: `3px solid var(--mantine-color-${stat.color}-filled)` }}>
+            <Card withBorder padding="lg" radius="md" shadow="sm" style={{ borderTop: `4px solid var(--mantine-color-${stat.color}-filled)` }}>
               <Group justify="space-between">
                 <Text size="sm" c="dimmed" fw={600} tt="uppercase">
                   {stat.title}
@@ -146,12 +211,58 @@ export default function Dashboard() {
               
               <Text size="xs" c="dimmed" mt={7}>
                 <IconBusinessplan size={12} stroke={1.5} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                С учетом всех заказов в базе
+                {dateFrom || dateTo ? 'За выбранный период' : 'За весь период учета'}
               </Text>
             </Card>
           </Grid.Col>
         ))}
       </Grid>
+
+      {/* ========================================== */}
+      {/* БЛОК 1.1: ДЕТАЛЬНАЯ СТРУКТУРА РАСХОДОВ */}
+      {/* ========================================== */}
+      <Paper withBorder p="xl" radius="md" shadow="sm" mb="xl" style={{ borderLeft: '4px solid #fa5252' }}>
+        <Title order={5} mb="sm" style={{ color: '#1B2E3D' }}>Структура общих расходов</Title>
+        <Text size="sm" c="dimmed" mb="lg">Показывает соотношение прямых затрат на заказы и операционных расходов компании.</Text>
+        
+        {loading ? (
+          <Skeleton height={20} radius="xl" mb="md" />
+        ) : (
+          <Progress.Root size="xl" radius="xl" mb="md">
+            <Tooltip label={`Себестоимость заказов: ${stats.orderExpenses.toLocaleString('ru-RU')} ₸ (${orderExpPercent}%)`}>
+              <Progress.Section value={orderExpPercent} color="red">
+                <Progress.Label>Заказы ({orderExpPercent}%)</Progress.Label>
+              </Progress.Section>
+            </Tooltip>
+            <Tooltip label={`Расходы фирмы: ${stats.companyExpenses.toLocaleString('ru-RU')} ₸ (${companyExpPercent}%)`}>
+              <Progress.Section value={companyExpPercent} color="orange">
+                <Progress.Label>Фирма ({companyExpPercent}%)</Progress.Label>
+              </Progress.Section>
+            </Tooltip>
+          </Progress.Root>
+        )}
+
+        <Grid mt="md">
+          <Grid.Col span={{ base: 12, sm: 6 }}>
+            <Group>
+              <ThemeIcon color="red" variant="light" radius="md"><IconReceipt2 size={18} /></ThemeIcon>
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Себестоимость заказов</Text>
+                <Text fw={700} size="lg" style={{ color: '#1B2E3D' }}>{stats.orderExpenses.toLocaleString('ru-RU')} ₸</Text>
+              </div>
+            </Group>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6 }}>
+            <Group>
+              <ThemeIcon color="orange" variant="light" radius="md"><IconBuildingSkyscraper size={18} /></ThemeIcon>
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Общие расходы фирмы (Аренда, ЗП)</Text>
+                <Text fw={700} size="lg" style={{ color: '#1B2E3D' }}>{stats.companyExpenses.toLocaleString('ru-RU')} ₸</Text>
+              </div>
+            </Group>
+          </Grid.Col>
+        </Grid>
+      </Paper>
 
       <Divider my="xl" />
 
@@ -183,7 +294,11 @@ export default function Dashboard() {
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Title order={4} mb="md" style={{ color: '#1B2E3D' }}>Последние транзакции</Title>
+          <Group justify="space-between" mb="md">
+            <Title order={4} style={{ color: '#1B2E3D' }}>Свежие заявки и заказы</Title>
+            <Badge color="gray" variant="light">Показаны последние активности</Badge>
+          </Group>
+          
           <Paper withBorder radius="md" p={0} shadow="sm" style={{ overflow: 'hidden' }}>
             {loading ? (
               <Box p="md">
@@ -195,8 +310,9 @@ export default function Dashboard() {
               <Table striped highlightOnHover verticalSpacing="md" horizontalSpacing="md">
                 <Table.Thead style={{ backgroundColor: '#f8f9fa' }}>
                   <Table.Tr>
-                    <Table.Th>ID Заказа</Table.Th>
-                    <Table.Th>Клиент</Table.Th>
+                    <Table.Th>Дата</Table.Th>
+                    <Table.Th>ID / Источник</Table.Th>
+                    <Table.Th>Клиент / Детали</Table.Th>
                     <Table.Th>Статус</Table.Th>
                     <Table.Th ta="right">Сумма</Table.Th>
                   </Table.Tr>
@@ -204,6 +320,7 @@ export default function Dashboard() {
                 <Table.Tbody>
                   {stats.recentOrders.map((order) => (
                     <Table.Tr key={order.id}>
+                      <Table.Td c="dimmed" fz="sm">{formatDate(order.date)}</Table.Td>
                       <Table.Td fw={500} style={{ color: '#1B2E3D' }}>{order.id.slice(0, 8).toUpperCase()}</Table.Td>
                       <Table.Td>{order.clientName || 'Неизвестно'}</Table.Td>
                       <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
@@ -215,8 +332,9 @@ export default function Dashboard() {
                 </Table.Tbody>
               </Table>
             ) : (
-              <Center py="xl">
-                <Text c="dimmed">Пока нет данных о последних транзакциях.</Text>
+              <Center py="xl" style={{ flexDirection: 'column' }}>
+                <IconShoppingCart size={40} color="#e0e0e0" />
+                <Text c="dimmed" mt="md">Пока нет данных о транзакциях за этот период.</Text>
               </Center>
             )}
           </Paper>

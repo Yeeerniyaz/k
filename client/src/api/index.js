@@ -8,7 +8,7 @@ import axios from 'axios';
 // Если ты открыл проект на ноуте (localhost), запросы летят на твой боевой VPS.
 // Если проект уже задеплоен на VPS, запросы летят по относительному пути '/api'.
 const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_URL = isLocalDev ? 'https://r.yeee.kz/api' : '/api';
+const API_URL = isLocalDev ? 'https://ukb.yeee.kz/api' : '/api';
 
 const api = axios.create({
     baseURL: API_URL,
