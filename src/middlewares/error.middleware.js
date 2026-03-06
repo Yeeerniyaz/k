@@ -1,63 +1,67 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-
-// --- ИМПОРТЫ МАРШРУТОВ ---
-import orderRoutes from './routes/order.routes.js';
-import portfolioRoutes from './routes/portfolio.routes.js';
-import authRoutes from './routes/auth.routes.js';
-import userRoutes from './routes/user.routes.js';
-import analyticsRoutes from './routes/analytics.routes.js';
-
-// 🔥 НОВЫЙ ИМПОРТ: Наш умный перехватчик ошибок
-import { errorHandler } from './middlewares/error.middleware.js';
-
-const app = express();
-
 // ==========================================
-// 1. БАЗОВЫЕ MIDDLEWARE (ЗАЩИТА И ПАРСИНГ)
+// ГЛОБАЛЬНЫЙ ПЕРЕХВАТЧИК ОШИБОК (ENTERPRISE GRADE)
 // ==========================================
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
 
-// ==========================================
-// 2. HEALTHCHECK (ПРОВЕРКА ЖИЗНЕСПОСОБНОСТИ)
-// ==========================================
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        status: 'success',
-        message: 'Royal Banners API is running smoothly',
-        timestamp: new Date().toISOString()
+export const errorHandler = (err, req, res, next) => {
+    // Логируем ошибку на сервере для дебага
+    console.error('💥 [ERROR CAUGHT]:', err.name, '|', err.message);
+
+    // Базовые значения
+    let statusCode = err.statusCode || 500;
+    let message = err.message || 'Внутренняя ошибка сервера';
+    let status = err.status || 'error';
+
+    // --------------------------------------------------------
+    // 1. ОБРАБОТКА ОШИБОК БАЗЫ ДАННЫХ (PRISMA)
+    // --------------------------------------------------------
+    if (err.code === 'P2002') {
+        statusCode = 409; // Conflict
+        const target = err.meta?.target || 'данными';
+        message = `Пользователь или запись с такими ${target} уже существует.`;
+    }
+    
+    if (err.code === 'P2025') {
+        statusCode = 404; // Not Found
+        message = 'Запрашиваемая запись не найдена в базе данных.';
+    }
+
+    if (err.code === 'P2003') {
+        statusCode = 400; // Bad Request
+        message = 'Ошибка целостности данных. Проверьте связанные поля.';
+    }
+
+    // --------------------------------------------------------
+    // 2. ОБРАБОТКА ОШИБОК АВТОРИЗАЦИИ (JWT)
+    // --------------------------------------------------------
+    if (err.name === 'JsonWebTokenError') {
+        statusCode = 401; // Unauthorized
+        message = 'Недействительный токен доступа. Пожалуйста, авторизуйтесь заново.';
+    }
+
+    if (err.name === 'TokenExpiredError') {
+        statusCode = 401; // Unauthorized
+        message = 'Время жизни сессии истекло. Пожалуйста, войдите в систему снова.';
+    }
+
+    // --------------------------------------------------------
+    // 3. ОБРАБОТКА ОШИБОК ЗАГРУЗКИ ФАЙЛОВ (MULTER)
+    // --------------------------------------------------------
+    if (err.name === 'MulterError') {
+        statusCode = 400; // Bad Request
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            message = 'Файл слишком большой. Максимальный размер - 10 МБ.';
+        } else {
+            message = `Ошибка загрузки файла: ${err.message}`;
+        }
+    }
+
+    // --------------------------------------------------------
+    // ФИНАЛЬНАЯ ОТПРАВКА ОТВЕТА КЛИЕНТУ
+    // --------------------------------------------------------
+    res.status(statusCode).json({
+        status,
+        message,
+        // Стек-трейс отдаем ТОЛЬКО в режиме разработки
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
-});
-
-// ==========================================
-// 3. ПОДКЛЮЧЕНИЕ РОУТОВ (API ENDPOINTS)
-// ==========================================
-app.use('/api/orders', orderRoutes);
-app.use('/api/portfolio', portfolioRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/analytics', analyticsRoutes);
-
-// ==========================================
-// 4. ОБРАБОТЧИК НЕСУЩЕСТВУЮЩИХ МАРШРУТОВ (404)
-// ==========================================
-app.use((req, res, next) => {
-    res.status(404).json({
-        status: 'error',
-        message: `Маршрут ${req.originalUrl} не найден на сервере`
-    });
-});
-
-// ==========================================
-// 5. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК (ENTERPRISE GRADE)
-// ==========================================
-// 🔥 НОВЫЙ КОД: Передаем управление нашему error.middleware.js
-app.use(errorHandler);
-
-export default app;
+};
