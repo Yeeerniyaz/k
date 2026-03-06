@@ -1,33 +1,48 @@
-import { PrismaClient } from '@prisma/client';
+// 🔥 СЕНЬОРСКАЯ ПРАКТИКА: dotenv должен быть самым первым импортом, 
+// чтобы переменные окружения пробросились во все последующие модули.
 import dotenv from 'dotenv';
+dotenv.config();
+
+import { PrismaClient } from '@prisma/client';
 import app from './app.js';
 
-// 1. Инициализация конфигурации окружения
-dotenv.config();
+// ==========================================
+// 1. ПРОВЕРКА ОБЯЗАТЕЛЬНЫХ ПЕРЕМЕННЫХ
+// ==========================================
+if (!process.env.DATABASE_URL) {
+    console.error('❌ ОШИБКА: Переменная DATABASE_URL не найдена в .env файле!');
+    console.error('Prisma не сможет подключиться к базе данных.');
+    process.exit(1);
+}
 
 // ==========================================
 // 2. PRISMA SINGLETON INSTANCE
 // ==========================================
-// Создаем один экземпляр PrismaClient для всего приложения.
-// Это предотвращает утечки памяти и лимиты по количеству соединений с БД (PostgreSQL/MySQL).
+// Явно передаем URL из env в конструктор, чтобы Prisma не пыталась 
+// использовать Engine Type "client" (Edge) по ошибке.
+
 export const prisma = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    datasources: {
+        db: {
+            url: process.env.DATABASE_URL,
+        },
+    },
+    log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
 });
 
 // ==========================================
-// 3. ПРОВЕРКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ
+// 3. ПРОВЕРКА ПОДКЛЮЧЕНИЯ К БАЗЕ
 // ==========================================
 async function connectDB() {
     try {
         await prisma.$connect();
-        console.log('✅ Database connected successfully (Prisma)');
+        console.log('✅ Database connected successfully via Prisma');
     } catch (error) {
-        console.error('❌ Database connection error:', error);
-        process.exit(1); // Завершаем процесс, если база недоступна
+        console.error('❌ Critical Database connection error:', error);
+        process.exit(1);
     }
 }
 
-// Запускаем проверку соединения
 connectDB();
 
 // ==========================================
@@ -41,27 +56,21 @@ const server = app.listen(PORT, () => {
 });
 
 // ==========================================
-// 5. ОБРАБОТКА КРИТИЧЕСКИХ ОШИБОК (SAFETY FIRST)
+// 5. ОБРАБОТКА КРИТИЧЕСКИХ ОШИБОК
 // ==========================================
 
-// Обработка ошибок вне Express (например, ошибки в асинхронных функциях)
 process.on('unhandledRejection', (err) => {
     console.log('🔥 UNHANDLED REJECTION! Shutting down...');
     console.error(err.name, err.message);
-    // Даем серверу время корректно закрыть текущие запросы перед выходом
-    server.close(() => {
-        process.exit(1);
-    });
+    server.close(() => process.exit(1));
 });
 
-// Обработка необработанных исключений
 process.on('uncaughtException', (err) => {
     console.log('🔥 UNCAUGHT EXCEPTION! Shutting down...');
     console.error(err.name, err.message);
     process.exit(1);
 });
 
-// SIGTERM - сигнал на завершение (например, от хостинга или Docker)
 process.on('SIGTERM', () => {
     console.log('👋 SIGTERM received. Shutting down gracefully');
     server.close(() => {
