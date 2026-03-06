@@ -3,15 +3,14 @@ version: '3.8'
 services:
   royal-banners-api:
     build: .
+    # 🔥 СЕНЬОРСКИЙ ХАК: Меняем имя образа, чтобы Portainer не смог использовать старый кэш и собрал всё заново!
+    image: royal-banners-api:v2 
     container_name: royal-banners-api
     restart: always
-    # 🔥 УБРАЛИ БЛОК env_file, так как Portainer сам держит ключи в памяти
     environment:
       - PORT=5005
       - NODE_ENV=production
-      # Подключаемся к нашему "Слону" напрямую по имени контейнера в одной сети
       - DATABASE_URL=postgresql://yeee:Qazplm01@datebase:5432/royal_banners?schema=public
-      # Вытягиваем секреты из раздела Environment variables в Portainer
       - JWT_SECRET=${JWT_SECRET}
       - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
@@ -21,7 +20,6 @@ services:
     networks:
       - shared_db_network
 
-# Подключаемся к существующей сети универсальной базы данных
 networks:
   shared_db_network:
     external: true
