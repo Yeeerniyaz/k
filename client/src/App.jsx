@@ -1,7 +1,10 @@
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell, Burger, Group, Title, NavLink, Button, Text, Center, Image } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDashboard, IconPhoto, IconShoppingCart, IconUsers, IconLogout } from '@tabler/icons-react';
+import { 
+  IconDashboard, IconPhoto, IconShoppingCart, IconUsers, 
+  IconLogout, IconReportMoney 
+} from '@tabler/icons-react';
 
 // ==========================================
 // ИМПОРТЫ НАШИХ БОЕВЫХ СТРАНИЦ
@@ -10,12 +13,10 @@ import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Orders from './pages/Orders.jsx';
-
-// ==========================================
-// ЗАГЛУШКИ ДЛЯ ОСТАВШИХСЯ СТРАНИЦ АДМИНКИ
-// ==========================================
-const Portfolio = () => <div style={{ fontFamily: '"Google Sans", sans-serif' }}><Title order={2} style={{ color: '#1B2E3D' }}>Портфолио</Title><Text mt="sm" c="dimmed">Редактор ваших лучших работ...</Text></div>;
-const Users = () => <div style={{ fontFamily: '"Google Sans", sans-serif' }}><Title order={2} style={{ color: '#1B2E3D' }}>Сотрудники</Title><Text mt="sm" c="dimmed">Управление доступом менеджеров...</Text></div>;
+import Portfolio from './pages/Portfolio.jsx';
+import Users from './pages/Users.jsx';
+import Category from './pages/Category.jsx';
+import Prices from './pages/Prices.jsx'; // 🔥 Новый модуль управления ценами
 
 // ==========================================
 // СЕНЬОРСКАЯ АРХИТЕКТУРА: ИЗОЛИРОВАННАЯ АДМИНКА
@@ -28,7 +29,7 @@ const AdminLayout = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('royal_token');
-    // При выходе выкидываем на публичную главную страницу к клиентам
+    // При выходе жестко выкидываем на публичную главную страницу к клиентам
     window.location.href = '/'; 
   };
 
@@ -42,6 +43,9 @@ const AdminLayout = () => {
       }}
       padding="md"
     >
+      {/* ========================================== */}
+      {/* ШАПКА АДМИНКИ */}
+      {/* ========================================== */}
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Group gap="sm">
@@ -62,18 +66,60 @@ const AdminLayout = () => {
         </Group>
       </AppShell.Header>
 
+      {/* ========================================== */}
+      {/* БОКОВОЕ МЕНЮ АДМИНКИ */}
+      {/* ========================================== */}
       <AppShell.Navbar p="md" style={{ fontFamily: '"Google Sans", sans-serif' }}>
-        <NavLink label="Дашборд" leftSection={<IconDashboard size="1.1rem" stroke={1.5} />} onClick={() => { navigate('/admin'); toggle(); }} color="royalBlue" variant="light" active={location.pathname === '/admin'} />
-        <NavLink label="Заказы" leftSection={<IconShoppingCart size="1.1rem" stroke={1.5} />} onClick={() => { navigate('/admin/orders'); toggle(); }} color="royalBlue" variant="light" active={location.pathname === '/admin/orders'} />
-        <NavLink label="Портфолио" leftSection={<IconPhoto size="1.1rem" stroke={1.5} />} onClick={() => { navigate('/admin/portfolio'); toggle(); }} color="royalBlue" variant="light" active={location.pathname === '/admin/portfolio'} />
-        <NavLink label="Сотрудники" leftSection={<IconUsers size="1.1rem" stroke={1.5} />} onClick={() => { navigate('/admin/users'); toggle(); }} color="royalBlue" variant="light" active={location.pathname === '/admin/users'} />
+        <NavLink 
+          label="Дашборд" 
+          leftSection={<IconDashboard size="1.1rem" stroke={1.5} />} 
+          onClick={() => { navigate('/admin'); toggle(); }} 
+          color="royalBlue" 
+          variant="light" 
+          active={location.pathname === '/admin' || location.pathname === '/admin/'} 
+        />
+        <NavLink 
+          label="Заказы" 
+          leftSection={<IconShoppingCart size="1.1rem" stroke={1.5} />} 
+          onClick={() => { navigate('/admin/orders'); toggle(); }} 
+          color="royalBlue" 
+          variant="light" 
+          active={location.pathname === '/admin/orders'} 
+        />
+        <NavLink 
+          label="Прайс-лист" 
+          leftSection={<IconReportMoney size="1.1rem" stroke={1.5} />} 
+          onClick={() => { navigate('/admin/prices'); toggle(); }} 
+          color="royalBlue" 
+          variant="light" 
+          active={location.pathname === '/admin/prices'} 
+        />
+        <NavLink 
+          label="Портфолио" 
+          leftSection={<IconPhoto size="1.1rem" stroke={1.5} />} 
+          onClick={() => { navigate('/admin/portfolio'); toggle(); }} 
+          color="royalBlue" 
+          variant="light" 
+          active={location.pathname === '/admin/portfolio'} 
+        />
+        <NavLink 
+          label="Сотрудники" 
+          leftSection={<IconUsers size="1.1rem" stroke={1.5} />} 
+          onClick={() => { navigate('/admin/users'); toggle(); }} 
+          color="royalBlue" 
+          variant="light" 
+          active={location.pathname === '/admin/users'} 
+        />
       </AppShell.Navbar>
 
+      {/* ========================================== */}
+      {/* РЕНДЕР КОНТЕНТА АДМИНКИ */}
+      {/* ========================================== */}
       <AppShell.Main bg="#f8f9fa">
-        {/* Вложенные роуты админки */}
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/prices" element={<Prices />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/users" element={<Users />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
@@ -92,17 +138,9 @@ export default function App() {
 
   return (
     <Routes>
-      {/* 1. ПУБЛИЧНАЯ ЗОНА (Доступна всем) */}
+      {/* 1. ПУБЛИЧНАЯ ЗОНА (Доступна всем клиентам) */}
       <Route path="/" element={<Home />} />
-      
-      {/* Роут для просмотра конкретной категории (Баннеры, Лайтбоксы и т.д.) */}
-      <Route path="/category/:id" element={
-        <div style={{ padding: '100px 20px', textAlign: 'center', fontFamily: '"Google Sans", sans-serif' }}>
-          <Title order={2} style={{ color: '#1B2E3D' }}>Работы категории</Title>
-          <Text c="dimmed" mt="sm" mb="xl">Скоро здесь появится галерея ваших проектов...</Text>
-          <Button component="a" href="/" color="#1B2E3D">На главную</Button>
-        </div>
-      } />
+      <Route path="/category/:id" element={<Category />} />
 
       {/* 2. АВТОРИЗАЦИЯ */}
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/admin" replace />} />
@@ -110,7 +148,7 @@ export default function App() {
       {/* 3. ПРИВАТНАЯ ЗОНА (Админка, защищена проверкой токена) */}
       <Route path="/admin/*" element={isAuthenticated ? <AdminLayout /> : <Navigate to="/login" replace />} />
 
-      {/* 4. ОБРАБОТКА ОШИБОК 404 (Если ввели несуществующий адрес - на главную) */}
+      {/* 4. ОБРАБОТКА ОШИБОК 404 */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
