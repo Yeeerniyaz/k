@@ -10,8 +10,8 @@ const prisma = new PrismaClient();
 async function seed() {
     console.log('🚀 Запуск скрипта создания администратора...');
 
-    const email = process.env.ADMIN_EMAIL || 'admin@royalbanners.kz';
-    const password = process.env.ADMIN_PASSWORD || 'RoyalAdmin2026!';
+    const email = 'admin@royalbanners.kz';
+    const password = 'RoyalAdmin2026!';
 
     try {
         // 1. Проверяем, есть ли уже админ в базе
