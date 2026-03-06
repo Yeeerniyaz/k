@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import path from 'path'; // 🔥 НОВОЕ: Для работы с путями папок
-import { fileURLToPath } from 'url'; // 🔥 НОВОЕ: Для правильного __dirname в модулях ESM
+import path from 'path'; // Для работы с путями папок
+import { fileURLToPath } from 'url'; // Для правильного __dirname в модулях ESM
 
 // --- ИМПОРТЫ МАРШРУТОВ API ---
 import orderRoutes from './routes/order.routes.js';
@@ -14,7 +14,7 @@ import analyticsRoutes from './routes/analytics.routes.js';
 
 import { errorHandler } from './middlewares/error.middleware.js';
 
-// 🔥 Настройка путей для ESM (так как мы используем import, а не require)
+// Настройка путей для ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -54,8 +54,9 @@ app.use('/api/analytics', analyticsRoutes);
 // ==========================================
 // 4. ОБРАБОТЧИК ОШИБОК ДЛЯ API (404)
 // ==========================================
-// 🔥 ВАЖНО: Если запрос шел именно к API, но маршрута нет — отдаем JSON ошибку.
-app.all('/api/*', (req, res) => {
+// 🔥 СЕНЬОРСКИЙ ФИКС: Используем app.use('/api') вместо app.all('/api/*')
+// Это совместимо со всеми версиями Express (включая v5)
+app.use('/api', (req, res) => {
     res.status(404).json({
         status: 'error',
         message: `API маршрут ${req.originalUrl} не найден`
@@ -63,18 +64,17 @@ app.all('/api/*', (req, res) => {
 });
 
 // ==========================================
-// 5. 🔥 РАЗДАЧА ФРОНТЕНДА (REACT CLIENT)
+// 5. РАЗДАЧА ФРОНТЕНДА (REACT CLIENT)
 // ==========================================
-// Указываем путь к будущей папке dist (куда Vite будет собирать фронтенд).
-// Предполагается, что папка client будет лежать в корне проекта рядом с src
+// Указываем путь к будущей папке dist
 const clientBuildPath = path.join(__dirname, '../client/dist');
 
-// Говорим Express раздавать статические файлы (JS, CSS, картинки) из этой папки
+// Говорим Express раздавать статические файлы из этой папки
 app.use(express.static(clientBuildPath));
 
-// Для ЛЮБОГО другого запроса (например, когда пользователь обновляет страницу /portfolio на фронтенде),
-// мы отдаем главный файл React — index.html. Всю остальную маршрутизацию возьмет на себя React Router.
-app.get('*', (req, res) => {
+// Для ЛЮБОГО другого запроса отдаем главный файл React — index.html
+// 🔥 СЕНЬОРСКИЙ ФИКС 2: Также убираем звездочку из app.get('*') и используем app.use()
+app.use((req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 
