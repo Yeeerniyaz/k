@@ -75,12 +75,16 @@ app.use('/api/finance', financeRoutes);
 // ОБРАБОТКА ОШИБОК (ERROR HANDLING)
 // ==========================================
 
-// Обработка несуществующих маршрутов (404)
-app.use('*path', (req, res) => {
-    res.status(404).json({
-        status: 'error',
-        message: `Маршрут ${req.originalUrl} не найден на этом сервере.`
-    });
+/
+const clientBuildPath = path.join(__dirname, '../client/dist');
+
+// Говорим Express раздавать статические файлы из этой папки
+app.use(express.static(clientBuildPath));
+
+// Для ЛЮБОГО другого запроса отдаем главный файл React — index.html
+// Также убираем звездочку из app.get('*') и используем app.use()
+app.use((req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 
 // Глобальный обработчик всех ошибок (Middleware)
