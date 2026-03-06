@@ -1,4 +1,4 @@
-// 1. СЕНЬОРСКИЙ ПРИОРЕТЕТ: Загрузка окружения в самом начале
+// 1. СЕНЬОРСКИЙ ПРИОРЕТЕТ: Сначала грузим окружение через абсолютный путь
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -6,65 +6,72 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Явно подгружаем .env (уже проверено, что работает)
+// Гарантируем, что .env прочитан до того, как Prisma вообще загрузится в память
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
+// 2. ИМПОРТ ПАКЕТОВ
 import { PrismaClient } from '@prisma/client';
 import app from './app.js';
 
-// ТЕРМИНАЛДАҒЫ ДИАГНОСТИКА
+// ДИАГНОСТИКА: Убеждаемся, что URL подтянулся
 console.log('-------------------------------------------');
-console.log('🔍 DATABASE_URL Status:', process.env.DATABASE_URL ? '✅ LOADED' : '❌ NOT FOUND');
-console.log('🔍 Running on Port:', process.env.PORT || 5005);
+console.log('🔍 SYSTEM CHECK:');
+console.log('📡 DATABASE_URL:', process.env.DATABASE_URL ? '✅ LOADED' : '❌ NOT FOUND');
 console.log('-------------------------------------------');
 
+if (!process.env.DATABASE_URL) {
+    console.error('🔥 CRITICAL: DATABASE_URL is missing. Please check your .env file!');
+    process.exit(1);
+}
+
 // ==========================================
-// 2. PRISMA SINGLETON (CLEAN & STABLE)
+// 3. PRISMA SINGLETON (ROBUST CONFIGURATION)
 // ==========================================
-// Поскольку переменная DATABASE_URL уже находится в process.env,
-// Prisma автоматически подхватит её. Нам не нужно передавать ничего в конструктор.
-// Это исключает любые ошибки валидации параметров.
+// Чтобы избежать ошибки "engine type client", мы явно прописываем 
+// datasourceUrl. Это заставляет Prisma использовать стандартный движок.
+
 export const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+    datasourceUrl: process.env.DATABASE_URL,
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
 });
 
 // ==========================================
-// 3. ПРОВЕРКА ПОДКЛЮЧЕНИЯ
+// 4. DATABASE CONNECTION
 // ==========================================
 async function connectDB() {
-  try {
-    await prisma.$connect();
-    console.log('✅ Prisma Engine: Connected to Database successfully');
-  } catch (error) {
-    console.error('❌ Prisma Engine: Connection failed!');
-    console.error('📝 Error message:', error.message);
-    // В продакшене здесь можно добавить уведомление в Telegram/Sentry
-  }
+    try {
+        await prisma.$connect();
+        console.log('✅ Prisma: Database connection established.');
+    } catch (error) {
+        console.error('❌ Prisma: Connection failed!');
+        console.error('📝 Details:', error.message);
+        
+        // Если база на другом хосте (datebase vs database), ловим это здесь
+        if (error.message.includes('getaddrinfo ENOTFOUND')) {
+            console.log('💡 Архитектуралық кеңес: .env файлындағы хостты тексер (datebase vs database)');
+        }
+    }
 }
 
 connectDB();
 
 // ==========================================
-// 4. ЗАПУСК СЕРВЕРА
+// 5. SERVER STARTUP
 // ==========================================
 const PORT = process.env.PORT || 5005;
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 API Service is live at http://localhost:${PORT}`);
+    console.log(`🚀 Senior Architect Service is active on port ${PORT}`);
 });
 
-// ==========================================
-// 5. ГЛОБАЛЬНАЯ ЗАЩИТА (SAFETY NET)
-// ==========================================
+// Глобальные обработчики для стабильности системы
 process.on('unhandledRejection', (err) => {
-  console.error('🔥 UNHANDLED REJECTION:', err);
-  // Мы не останавливаем сервер, чтобы он продолжал обслуживать другие запросы
+    console.error('🔥 UNHANDLED REJECTION:', err);
 });
 
 process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received. Closing resources...');
-  server.close(() => {
-    prisma.$disconnect();
-    console.log('💥 Server and Database disconnected');
-  });
+    server.close(() => {
+        prisma.$disconnect();
+        console.log('💥 System offline');
+    });
 });
