@@ -2,63 +2,54 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
-// Подгружаем переменные окружения, чтобы скрипт видел базу
 dotenv.config();
 
+// Инициализируем клиент явно
 const prisma = new PrismaClient();
 
-// ==========================================
-// СКРИПТ СОЗДАНИЯ ПЕРВОГО СУПЕР-АДМИНА
-// ==========================================
-const seedAdmin = async () => {
-    try {
-        console.log('🔄 Запуск скрипта инициализации базы данных...');
+async function seed() {
+    console.log('🚀 Запуск скрипта создания администратора...');
 
-        // 1. Проверяем, есть ли уже хотя бы один админ в системе
-        const existingAdmin = await prisma.user.findFirst({
-            where: { role: 'ADMIN' }
+    const email = process.env.ADMIN_EMAIL || 'admin@royalbanners.kz';
+    const password = process.env.ADMIN_PASSWORD || 'RoyalAdmin2026!';
+
+    try {
+        // 1. Проверяем, есть ли уже админ в базе
+        const existingAdmin = await prisma.user.findUnique({
+            where: { email }
         });
 
         if (existingAdmin) {
-            console.log('✅ Супер-админ уже существует в базе. Создание отменено.');
-            process.exit(0);
+            console.log(`⚠️  Администратор с email ${email} уже существует.`);
+            return;
         }
 
-        // 2. Настройки по умолчанию для первого админа
-        // В реальном проекте логин/пароль можно брать из .env
-        const adminEmail = process.env.ADMIN_EMAIL
-        const adminPassword = process.env.ADMIN_PASSWORD
-        const adminName = 'Куаныш (Super Admin)';
-        const adminPhone = '+77089321854';
+        // 2. Хешируем пароль
+        const hashedPassword = await bcrypt.hash(password, 12);
 
-        // 3. Хэшируем пароль перед сохранением
-        const salt = await bcrypt.genSalt(12);
-        const hashedPassword = await bcrypt.hash(adminPassword, salt);
-
-        // 4. Создаем запись в базе
-        await prisma.user.create({
+        // 3. Создаем запись
+        const admin = await prisma.user.create({
             data: {
-                email: adminEmail,
+                email,
                 password: hashedPassword,
-                name: adminName,
-                phone: adminPhone,
-                role: 'ADMIN'
+                role: 'ADMIN',
+                name: 'Super Admin'
             }
         });
 
-        console.log('🎉 Успех! Первый Супер-Админ успешно создан.');
-        console.log(`📧 Email: ${adminEmail}`);
-        console.log(`🔑 Пароль: ${adminPassword}`);
-        console.log('⚠️ Обязательно смените пароль после первого входа!');
+        console.log('======================================');
+        console.log('✅ СУПЕР-АДМИНИСТРАТОР СОЗДАН!');
+        console.log(`📧 Email: ${admin.email}`);
+        console.log(`🔑 Password: ${password}`);
+        console.log('ℹ️  Сохраните эти данные для входа.');
+        console.log('======================================');
 
-        process.exit(0);
     } catch (error) {
         console.error('💥 Ошибка при создании админа:', error);
-        process.exit(1);
     } finally {
+        // Обязательно закрываем соединение, чтобы скрипт завершился
         await prisma.$disconnect();
     }
-};
+}
 
-// Запускаем функцию
-seedAdmin();
+seed();
