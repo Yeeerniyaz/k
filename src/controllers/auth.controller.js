@@ -1,115 +1,112 @@
-import { prisma } from '../server.js';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { prisma } from '../server.js'; // Используем единый инстанс из server.js
 
-// 1. Регистрация нового пользователя
-export const register = async (req, res, next) => {
+// Вспомогательная функция для создания JWT токена
+// Срок жизни токена — 24 часа. Достаточно для рабочего дня.
+const signToken = (id) => {
+    return jwt.sign(
+        { id }, 
+        process.env.JWT_SECRET || 'royal_banners_secret_key_2026', 
+        { expiresIn: '24h' }
+    );
+};
+
+// ==========================================
+// 1. LOGIN: Вход в систему
+// ==========================================
+export const login = async (req, res, next) => {
     try {
-        const { email, password, name, phone, role } = req.body;
+        const { email, password } = req.body;
 
+        // 1. Проверяем, переданы ли email и пароль
         if (!email || !password) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Email и пароль обязательны для заполнения'
+                message: 'Пожалуйста, укажите email и пароль.'
             });
         }
 
-        // Проверяем, существует ли уже пользователь с таким email
-        const existingUser = await prisma.user.findUnique({
+        // 2. Ищем пользователя в базе
+        // Обязательно вытягиваем пароль для сравнения (bcrypt)
+        const user = await prisma.user.findUnique({
             where: { email }
         });
 
-        if (existingUser) {
-            return res.status(409).json({
+        // 3. Проверяем существование пользователя и корректность пароля
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({
                 status: 'error',
-                message: 'Пользователь с таким email уже существует'
+                message: 'Неверный email или пароль.'
             });
         }
 
-        // Хэшируем пароль (12 раундов - современный стандарт безопасности)
-        const salt = await bcrypt.genSalt(12);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        // 4. Генерируем токен
+        const token = signToken(user.id);
 
-        // Создаем пользователя в базе
-        const newUser = await prisma.user.create({
+        // 5. Отправляем ответ без пароля
+        res.status(200).json({
+            status: 'success',
+            token,
             data: {
-                email,
-                password: hashedPassword,
-                name,
-                phone,
-                // Если роль передана (например, создаем админа), используем её, иначе CLIENT
-                role: role || 'CLIENT'
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role
+                }
+            }
+        });
+    } catch (error) {
+        console.error('🔥 Login Error:', error);
+        next(error);
+    }
+};
+
+// ==========================================
+// 2. GET ME: Получение данных текущего пользователя
+// ==========================================
+// Используется фронтендом при каждой перезагрузке страницы, 
+// чтобы проверить, валиден ли токен и кто залогинен.
+export const getMe = async (req, res, next) => {
+    try {
+        // Мы попадаем сюда только после прохождения middleware 'protect',
+        // который уже записал данные пользователя в req.user.
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                createdAt: true
             }
         });
 
-        // Безопасность: исключаем хэш пароля из ответа API
-        const { password: _, ...userWithoutPassword } = newUser;
+        if (!user) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Пользователь не найден.'
+            });
+        }
 
-        res.status(201).json({
+        res.status(200).json({
             status: 'success',
-            message: 'Пользователь успешно зарегистрирован',
-            data: userWithoutPassword
+            data: { user }
         });
     } catch (error) {
         next(error);
     }
 };
 
-// 2. Авторизация пользователя (Login)
-export const login = async (req, res, next) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Email и пароль обязательны для авторизации'
-            });
-        }
-
-        // Ищем пользователя в базе
-        const user = await prisma.user.findUnique({
-            where: { email }
-        });
-
-        if (!user) {
-            return res.status(401).json({
-                status: 'error',
-                message: 'Неверный email или пароль'
-            });
-        }
-
-        // Сравниваем введенный пароль с хэшем из базы
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-
-        if (!isPasswordValid) {
-            return res.status(401).json({
-                status: 'error',
-                message: 'Неверный email или пароль'
-            });
-        }
-
-        // Генерируем JWT токен
-        // В идеале JWT_SECRET нужно добавить в твой .env файл!
-        const jwtSecret = process.env.JWT_SECRET || 'super_secret_royal_banners_key_2026';
-        const token = jwt.sign(
-            { id: user.id, role: user.role, email: user.email },
-            jwtSecret,
-            { expiresIn: '7d' } // Токен живет 7 дней, чтобы менеджерам не приходилось логиниться каждый день
-        );
-
-        // Безопасность: исключаем хэш пароля из ответа
-        const { password: _, ...userWithoutPassword } = user;
-
-        res.status(200).json({
-            status: 'success',
-            message: 'Авторизация успешна',
-            data: {
-                user: userWithoutPassword,
-                token
-            }
-        });
-    } catch (error) {
-        next(error);
-    }
+// ==========================================
+// 3. LOGOUT: Выход (на стороне сервера)
+// ==========================================
+// В JWT архитектуре выход обычно обрабатывается на фронтенде удалением токена,
+// но мы оставляем эндпоинт для чистоты структуры.
+export const logout = (req, res) => {
+    res.status(200).json({ 
+        status: 'success', 
+        message: 'Вы успешно вышли из системы.' 
+    });
 };
