@@ -1,51 +1,38 @@
 # ==========================================
-# ЭТАП 1: СБОРКА ФРОНТЕНДА (REACT)
+# 1-КЕЗЕҢ: ФРОНТЕНДТІ ЖИНАУ
 # ==========================================
 FROM node:22-slim AS frontend-builder
-
 WORKDIR /build/client
-
-# Копируем конфиги фронтенда
 COPY client/package*.json ./
 RUN npm install
-
-# Собираем фронтенд (создает папку dist)
 COPY client/ ./
 RUN npm run build
 
 # ==========================================
-# ЭТАП 2: СБОРКА И ЗАПУСК БЭКЕНДА
+# 2-КЕЗЕҢ: БЭКЕНДТІ ДАЙЫНДАУ
 # ==========================================
 FROM node:22-slim
-
-# Устанавливаем OpenSSL и сертификаты (критично для движка Prisma)
+# Prisma-ға OpenSSL міндетті түрде керек
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 1. Копируем конфиги бэкенда и схему БД
+# Конфигтерді көшіру
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# 2. Устанавливаем ВСЕ зависимости
-# (NODE_ENV=production еще НЕ установлен, поэтому prisma установится из devDependencies)
+# 🔥 МАҢЫЗДЫ: Алдымен барлық пакеттерді орнатамыз (Dev-пакеттермен бірге)
 RUN npm install
 
-# 3. Генерируем клиент Prisma
-# Теперь памяти (Swap) и пакетов хватит на 100%
+# 🔥 МАҢЫЗДЫ: Присманы генерация жасаймыз
 RUN npx prisma generate
 
-# 4. Копируем исходный код бэкенда
-COPY . .
-
-# 5. Копируем собранный фронтенд из первого этапа
-COPY --from=frontend-builder /build/client/dist ./client/dist
-
-# 6. ТОЛЬКО СЕЙЧАС включаем продакшн режим
+# ЕНДІ ҒАНА продакшн режимді қосамыз
 ENV NODE_ENV=production
 
-# Сообщаем порт
-EXPOSE 5005
+# Кодты және жиналған фронтендті көшіру
+COPY . .
+COPY --from=frontend-builder /build/client/dist ./client/dist
 
-# Запуск сервера
+EXPOSE 5005
 CMD ["npm", "start"]
