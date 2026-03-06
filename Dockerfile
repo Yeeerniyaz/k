@@ -16,7 +16,6 @@ COPY prisma ./prisma/
 # Шаг 2: Устанавливаем зависимости и генерируем Prisma 
 # (Это съест минимум ресурсов сервера)
 RUN npm install
-RUN npx prisma generate
 
 # Шаг 3: Включаем production режим
 ENV NODE_ENV=production
