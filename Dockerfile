@@ -24,20 +24,26 @@ FROM node:22-slim
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-ENV NODE_ENV=production
 
-# Копируем конфиги бэкенда
+# СЕНЬОРСКИЙ ШАГ 1: Копируем конфиги бэкенда
 COPY package*.json ./
 COPY prisma ./prisma/
-COPY prisma.config.ts ./
 
+# СЕНЬОРСКИЙ ШАГ 2: Устанавливаем ВСЕ зависимости (пока без флага production),
+# чтобы установился CLI-инструмент prisma
 RUN npm install
+
+# СЕНЬОРСКИЙ ШАГ 3: Генерируем клиент Prisma
 RUN npx prisma generate
 
-# Копируем исходный код бэкенда
+# СЕНЬОРСКИЙ ШАГ 4: ТОЛЬКО ТЕПЕРЬ включаем production режим,
+# чтобы бэкенд и Express.js работали максимально быстро
+ENV NODE_ENV=production
+
+# Копируем исходный код бэкенда (исправлен перенос строки)
 COPY . .
 
-# 🔥 СЕНЬОРСКИЙ ШАГ: Копируем ГОТОВУЮ папку dist из первого этапа!
+# Копируем ГОТОВУЮ папку dist из первого этапа!
 # Теперь нашему src/app.js будет что раздавать пользователям.
 COPY --from=frontend-builder /build/client/dist ./client/dist
 
