@@ -26,7 +26,7 @@ RUN npm install
 
 # 🔥 МАҢЫЗДЫ: Присманы генерация жасаймыз
 RUN npx prisma generate
-
+RUN npx prisma generate
 # ЕНДІ ҒАНА продакшн режимді қосамыз
 ENV NODE_ENV=production
 
