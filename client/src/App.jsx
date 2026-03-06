@@ -94,7 +94,7 @@ export default function App() {
                 {/* ВАЖНО: Если твой конь в SVG темный, добавь ему fill="#ffffff" прямо в файле logo.svg, 
                   чтобы он был белым на темном фоне контейнера!
                 */}
-                <Image src="/src/assets/logo.svg" w={24} h={24} fit="contain" />
+                <Image src="/assets/logo.svg" w={24} h={24} fit="contain" />
               </Center>
 
               {/* Текст шрифтом Alyamama. visibleFrom="sm" прячет его на телефонах! */}

@@ -69,7 +69,7 @@ export default function Login() {
       >
         {/* Логотип: на телефоне поменьше, на ПК побольше */}
         <Image 
-          src="/src/assets/logo.svg" 
+          src="/assets/logo.svg" 
           w={{ base: 50, md: 90 }} 
           fit="contain" 
           mb="md" 
