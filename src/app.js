@@ -27,7 +27,15 @@ app.use(helmet({
     // Отключаем жесткий CSP, чтобы React мог грузить свои скрипты и картинки с Cloudinary
     contentSecurityPolicy: false, 
 }));
-app.use(cors());
+
+// 🔥 СЕНЬОРСКИЙ ФИКС CORS: Настраиваем шлюз для работы локального React и продакшена
+app.use(cors({
+    origin: true, // Автоматически подстраивается под домен запроса (пускает и localhost, и основной сайт)
+    credentials: true, // Разрешаем передачу токенов авторизации (Authorization headers)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Разрешаем все нужные методы
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'] // Явно указываем разрешенные заголовки
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
@@ -54,7 +62,7 @@ app.use('/api/analytics', analyticsRoutes);
 // ==========================================
 // 4. ОБРАБОТЧИК ОШИБОК ДЛЯ API (404)
 // ==========================================
-// 🔥 СЕНЬОРСКИЙ ФИКС: Используем app.use('/api') вместо app.all('/api/*')
+// Используем app.use('/api') вместо app.all('/api/*')
 // Это совместимо со всеми версиями Express (включая v5)
 app.use('/api', (req, res) => {
     res.status(404).json({
@@ -73,7 +81,7 @@ const clientBuildPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientBuildPath));
 
 // Для ЛЮБОГО другого запроса отдаем главный файл React — index.html
-// 🔥 СЕНЬОРСКИЙ ФИКС 2: Также убираем звездочку из app.get('*') и используем app.use()
+// Также убираем звездочку из app.get('*') и используем app.use()
 app.use((req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
