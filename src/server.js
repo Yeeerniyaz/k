@@ -1,76 +1,72 @@
-// 🔥 СЕНЬОРСКАЯ ПРАКТИКА №1: Загружаем переменные окружения ДО импорта Prisma.
-// Это гарантирует, что Prisma увидит DATABASE_URL в процессе инициализации.
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// --- СЕНЬОРСКИЙ FIX ДЛЯ DOTENV ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Явно указываем путь к .env файлу на уровень выше от src
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { PrismaClient } from '@prisma/client';
 import app from './app.js';
 
 // ==========================================
-// 1. ПРОВЕРКА КОНФИГУРАЦИИ
+// 1. ДИАГНОСТИКА ОКРУЖЕНИЯ
 // ==========================================
+// Если это выведет undefined, значит файл .env не читается сервером
+console.log('🔍 Проверка DATABASE_URL:', process.env.DATABASE_URL ? '✅ Найдена' : '❌ НЕ НАЙДЕНА');
+
 if (!process.env.DATABASE_URL) {
-    console.error('❌ ОШИБКА: DATABASE_URL не определена в файле .env');
+    console.error('🔥 КРИТИЧЕСКАЯ ОШИБКА: Файл .env пуст или не найден!');
+    console.error('Пожалуйста, создай файл .env в корне проекта и добавь туда DATABASE_URL.');
     process.exit(1);
 }
 
 // ==========================================
-// 2. PRISMA SINGLETON INSTANCE
+// 2. PRISMA SINGLETON
 // ==========================================
-// Оставляем конструктор чистым. Prisma сама подхватит DATABASE_URL из env.
-// Если нужно передать URL принудительно, в новых версиях используется 'datasourceUrl'.
+// В Prisma 7+, если DATABASE_URL не подхватывается автоматически,
+// мы передаем его через конструктор в свойство datasourceUrl
+
 export const prisma = new PrismaClient({
+    datasourceUrl: process.env.DATABASE_URL, // Прямая передача URL
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
 // ==========================================
-// 3. ПРОВЕРКА ПОДКЛЮЧЕНИЯ
+// 3. ПОДКЛЮЧЕНИЕ
 // ==========================================
 async function connectDB() {
     try {
         await prisma.$connect();
-        console.log('✅ Database connected successfully (Prisma Engine)');
+        console.log('✅ База деректеріне қосылу сәтті аяқталды!');
     } catch (error) {
-        console.error('❌ Critical Database error:', error.message);
-        // Не падаем сразу, даем шанс на рестарт в Docker/PM2, но логгируем проблему
+        console.error('❌ Prisma қосылу қатесі:', error.message);
     }
 }
 
 connectDB();
 
 // ==========================================
-// 4. ЗАПУСК СЕРВЕРА
+// 4. ЗАПУСК
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
-    console.log(`🚀 Senior Architect Server is running on port ${PORT}`);
-    console.log(`🌍 Mode: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🚀 Server is flying on port ${PORT}`);
 });
 
-// ==========================================
-// 5. ОБРАБОТКА КРИТИЧЕСКИХ СОБЫТИЙ
-// ==========================================
-
-// Обработка ошибок в асинхронных цепочках
+// Глобальная защита от падения
 process.on('unhandledRejection', (err) => {
-    console.error('🔥 UNHANDLED REJECTION! Shutting down...');
-    console.error(err);
+    console.error('🔥 UNHANDLED REJECTION:', err);
     server.close(() => process.exit(1));
 });
 
-// Обработка непредвиденных исключений
-process.on('uncaughtException', (err) => {
-    console.error('🔥 UNCAUGHT EXCEPTION! Shutting down...');
-    console.error(err);
-    process.exit(1);
-});
-
-// Мягкое завершение (SIGTERM)
 process.on('SIGTERM', () => {
-    console.log('👋 SIGTERM received. Shutting down gracefully');
     server.close(() => {
         prisma.$disconnect();
-        console.log('💥 Process terminated!');
+        console.log('💥 Process terminated');
     });
 });
