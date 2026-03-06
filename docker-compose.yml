@@ -3,8 +3,6 @@ version: '3.8'
 services:
   royal-banners-api:
     build: .
-    # 🔥 СЕНЬОРСКИЙ ХАК: Меняем имя образа, чтобы Portainer не смог использовать старый кэш и собрал всё заново!
-    image: royal-banners-api:v2 
     container_name: royal-banners-api
     restart: always
     environment:
