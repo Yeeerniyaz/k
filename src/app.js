@@ -76,7 +76,7 @@ app.use('/api/finance', financeRoutes);
 // ==========================================
 
 // Обработка несуществующих маршрутов (404)
-app.use('*', (req, res) => {
+app.use('*path', (req, res) => {
     res.status(404).json({
         status: 'error',
         message: `Маршрут ${req.originalUrl} не найден на этом сервере.`
