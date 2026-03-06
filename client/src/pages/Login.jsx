@@ -1,110 +1,173 @@
-import { useState } from "react";
+import { useState } from 'react';
 import {
   TextInput,
   PasswordInput,
-  Paper,
   Title,
   Text,
-  Container,
   Button,
   Stack,
   Center,
   Image,
-} from "@mantine/core";
-import { IconAt, IconLock } from "@tabler/icons-react";
-import api from "../api/index.js";
+  Flex,
+  Box
+} from '@mantine/core';
+import { IconAt, IconLock } from '@tabler/icons-react';
+import api from '../api/index.js';
 
 export default function Login() {
-  // Состояния для хранения введенных данных
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // ==========================================
+  // СОСТОЯНИЯ
+  // ==========================================
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Функция отправки формы на наш Node.js бэкенд
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА
+  // ==========================================
   const handleLogin = async (e) => {
-    e.preventDefault(); // Останавливаем перезагрузку страницы
+    e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      // Стучимся в наш смарт-API (он сам решит, слать на VPS или локально)
-      const response = await api.post("/auth/login", { email, password });
-
-      // Достаем токен из ответа бэкенда
+      const response = await api.post('/auth/login', { email, password });
       const { token } = response.data.data;
-
-      // Прячем токен в сейф браузера (localStorage)
-      localStorage.setItem("royal_token", token);
-
-      // Жестко перезагружаем страницу и кидаем в корень,
-      // чтобы App.jsx увидел токен и пустил нас в админку
-      window.location.href = "/";
+      
+      localStorage.setItem('royal_token', token);
+      window.location.href = '/';
     } catch (err) {
-      // Если пароль неверный или сервер ответил ошибкой — выводим красивое сообщение
-      setError(
-        err.response?.data?.message || "Ошибка авторизации. Проверьте данные.",
-      );
+      setError(err.response?.data?.message || 'Ошибка авторизации. Проверьте данные.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container size={420} my={80}>
-      <Center mb="lg" bg="gray">
-        {/* Выводим твоего коня. Vite сам найдет его в папке public/assets/ */}
-        <Image
-          src="/src/assets/logo.svg"
-          alt="Royal Banners Logo"
-          w={100}
-          fit="contain"
+    // 🔥 СЕНЬОРСКИЙ ХАК: Flex-контейнер на весь экран, перекрывающий всё остальное
+    <Flex
+      pos="fixed"
+      top={0}
+      left={0}
+      w="100vw"
+      h="100vh"
+      style={{ zIndex: 9999, fontFamily: '"Google Sans", sans-serif' }}
+      // На мобилках колонкой (сверху вниз), на ПК строкой (слева направо)
+      direction={{ base: 'column', md: 'row' }}
+    >
+      
+      {/* ========================================== */}
+      {/* ЛЕВАЯ ЗОНА: БРЕНДИНГ (Синяя) */}
+      {/* ========================================== */}
+      <Center
+        w={{ base: '100%', md: '45%' }}
+        h={{ base: '35%', md: '100%' }}
+        bg="#1B2E3D"
+        p="xl"
+        style={{ flexDirection: 'column', textAlign: 'center' }}
+      >
+        {/* Логотип: на телефоне поменьше, на ПК побольше */}
+        <Image 
+          src="/src/assets/logo.svg" 
+          w={{ base: 50, md: 90 }} 
+          fit="contain" 
+          mb="md" 
         />
+        
+        <Title
+          order={1}
+          style={{
+            fontFamily: '"Alyamama", sans-serif',
+            color: 'white',
+            letterSpacing: '2px',
+            fontSize: 'clamp(28px, 4vw, 42px)' // Адаптивный размер шрифта
+          }}
+        >
+          ROYAL BANNERS
+        </Title>
+        
+        <Text 
+          c="rgba(255, 255, 255, 0.7)" 
+          mt="sm" 
+          size="lg" 
+          visibleFrom="sm" // Показываем этот текст только на ПК
+        >
+          Единая система управления предприятием
+        </Text>
       </Center>
 
-      <Title ta="center" order={2}>
-        Добро пожаловать
-      </Title>
-      <Text c="dimmed" size="sm" ta="center" mt={5} mb={30}>
-        Войдите в панель управления Royal Banners
-      </Text>
+      {/* ========================================== */}
+      {/* ПРАВАЯ ЗОНА: ФОРМА АВТОРИЗАЦИИ (Белая) */}
+      {/* ========================================== */}
+      <Center
+        w={{ base: '100%', md: '55%' }}
+        h={{ base: '65%', md: '100%' }}
+        bg="white"
+        p="xl"
+      >
+        {/* Контейнер ограничивает ширину формы, чтобы она не растягивалась на весь экран */}
+        <Box w="100%" maw={380}>
+          <Title order={2} mb={5} style={{ color: '#1B2E3D' }}>
+            Вход в систему
+          </Title>
+          <Text c="dimmed" size="sm" mb={35}>
+            Введите ваши учетные данные для доступа к панели
+          </Text>
 
-      {/* Сама карточка с формой. На белом фоне shadow="md" даст красивую тень */}
-      <Paper withBorder shadow="md" p={30} mt={30} radius="md">
-        <form onSubmit={handleLogin}>
-          <Stack>
-            <TextInput
-              label="Email"
-              placeholder="admin@royalbanners.kz"
-              required
-              leftSection={<IconAt size={16} stroke={1.5} />}
-              value={email}
-              onChange={(e) => setEmail(e.currentTarget.value)}
-              error={error && " "} // Подсвечиваем инпут красным, если есть ошибка
-            />
+          <form onSubmit={handleLogin}>
+            <Stack gap="md">
+              <TextInput
+                label="Email"
+                placeholder="admin@royalbanners.kz"
+                required
+                leftSection={<IconAt size={18} stroke={1.5} color="#1B2E3D" />}
+                value={email}
+                onChange={(e) => setEmail(e.currentTarget.value)}
+                error={error && " "}
+                styles={{
+                  label: { color: '#1B2E3D', fontWeight: 600, marginBottom: '6px' },
+                  input: { fontFamily: '"Google Sans", sans-serif', borderColor: error ? 'red' : '#e0e0e0' }
+                }}
+              />
+              
+              <PasswordInput
+                label="Пароль"
+                placeholder="Ваш пароль"
+                required
+                leftSection={<IconLock size={18} stroke={1.5} color="#1B2E3D" />}
+                value={password}
+                onChange={(e) => setPassword(e.currentTarget.value)}
+                error={error}
+                styles={{
+                  label: { color: '#1B2E3D', fontWeight: 600, marginBottom: '6px' },
+                  input: { fontFamily: '"Google Sans", sans-serif', borderColor: error ? 'red' : '#e0e0e0' },
+                  error: { fontFamily: '"Google Sans", sans-serif', marginTop: '6px' }
+                }}
+              />
+              
+              <Button 
+                type="submit" 
+                fullWidth 
+                mt="xl" 
+                loading={loading} 
+                radius="md"
+                size="lg"
+                style={{ 
+                  fontFamily: '"Google Sans", sans-serif', 
+                  fontWeight: 600,
+                  backgroundColor: '#1B2E3D',
+                  color: 'white',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Войти в панель
+              </Button>
+            </Stack>
+          </form>
+        </Box>
+      </Center>
 
-            <PasswordInput
-              label="Пароль"
-              placeholder="Ваш пароль"
-              required
-              leftSection={<IconLock size={16} stroke={1.5} />}
-              value={password}
-              onChange={(e) => setPassword(e.currentTarget.value)}
-              error={error} // Текст ошибки выводим под паролем
-            />
-
-            <Button
-              type="submit"
-              fullWidth
-              mt="xl"
-              loading={loading}
-              color="orange"
-            >
-              Войти в систему
-            </Button>
-          </Stack>
-        </form>
-      </Paper>
-    </Container>
+    </Flex>
   );
 }
