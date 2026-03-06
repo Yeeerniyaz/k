@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+// 🔥 СЕНЬОРСКАЯ ПРАКТИКА: Импортируем готовый инстанс Prisma из server.js
+// Это предотвращает PrismaClientInitializationError и лимиты соединений.
+import { prisma } from '../server.js';
 
 // ==========================================
 // 1. ПОЛУЧЕНИЕ ВСЕХ ЗАКАЗОВ (С РАСХОДАМИ)
@@ -9,12 +10,12 @@ export const getOrders = async (req, res, next) => {
         const orders = await prisma.order.findMany({
             orderBy: { createdAt: 'desc' },
             include: {
-                expenses: true, // 🔥 Обязательно подтягиваем расходы (себестоимость) для фронтенда
-                client: true    // Подтягиваем данные зарегистрированного B2B клиента, если есть
+                expenses: true, // Подтягиваем расходы (себестоимость)
+                client: true    // Подтягиваем данные клиента
             }
         });
 
-        // Адаптируем данные под интерфейс фронтенда (маппинг полей)
+        // Маппинг полей для совместимости с фронтендом
         const formattedOrders = orders.map(order => ({
             ...order,
             clientName: order.customerName,
@@ -42,7 +43,7 @@ export const createOrder = async (req, res, next) => {
                 description: description || '',
                 totalPrice: price ? parseInt(price) : 0,
                 status: status || 'NEW',
-                serviceType: serviceType || 'BANNERS', // Дефолтное значение Enum, если фронт не передал
+                serviceType: serviceType || 'BANNERS',
             }
         });
 
@@ -60,17 +61,14 @@ export const updateOrder = async (req, res, next) => {
         const { id } = req.params;
         const { status, price, expenses } = req.body;
 
-        // Формируем базовый объект обновления
         const updateData = {};
         if (status) updateData.status = status;
         if (price !== undefined) updateData.totalPrice = parseInt(price);
 
-        // 🔥 Смарт-обновление расходов (Expenses)
-        // Если фронтенд прислал массив расходов, мы используем транзакционный подход Prisma:
-        // Удаляем старые расходы этого заказа и записываем новые (чтобы избежать дублей)
+        // Смарт-обновление расходов: удаляем старые, создаем новые
         if (expenses && Array.isArray(expenses)) {
             updateData.expenses = {
-                deleteMany: {}, // Очищаем старые привязанные расходы
+                deleteMany: {},
                 create: expenses.map(exp => ({
                     category: exp.category || 'Прочее',
                     amount: parseInt(exp.amount) || 0,
@@ -83,7 +81,7 @@ export const updateOrder = async (req, res, next) => {
         const updatedOrder = await prisma.order.update({
             where: { id },
             data: updateData,
-            include: { expenses: true } // Возвращаем обновленный заказ вместе с расходами
+            include: { expenses: true }
         });
 
         res.status(200).json({ success: true, data: updatedOrder, message: 'Заказ и финансы обновлены' });
@@ -99,8 +97,7 @@ export const deleteOrder = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        // Благодаря onDelete: Cascade в schema.prisma, все связанные расходы (Expenses) 
-        // удалятся автоматически вместе с заказом.
+        // Благодаря каскадному удалению в Prisma, связанные расходы удалятся сами
         await prisma.order.delete({
             where: { id }
         });
