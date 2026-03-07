@@ -26,7 +26,6 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
-// Убираем API_URL, так как прокси нам не нужен
 import { fetchPortfolio as apiFetchPortfolio } from "../api/axios.js";
 
 export default function PublicPortfolio() {
@@ -62,7 +61,9 @@ export default function PublicPortfolio() {
       setLoading(true);
       setError(null);
       const response = await apiFetchPortfolio();
-      setItems(response.data?.data || response.data || []);
+      
+      const data = response.data?.data || response.data || [];
+      setItems(data);
     } catch (err) {
       console.error("Ошибка загрузки портфолио:", err);
       setItems([]);
@@ -77,7 +78,7 @@ export default function PublicPortfolio() {
   }, []);
 
   // ==========================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (СЕНЬОР-ФИКС)
   // ==========================================
   const getCategoryLabel = (val) => {
     const cat = categories.find(
@@ -86,16 +87,28 @@ export default function PublicPortfolio() {
     return cat ? cat.label : val;
   };
 
+  // 🔥 SENIOR FIX: Жесткая санитария URL для мобильных браузеров
+  const getSafeUrl = (url) => {
+    if (!url) return null;
+    let safeUrl = url.replace('http://', 'https://'); // Решает проблему Mixed Content
+    
+    // БРОНЕЖИЛЕТ ДЛЯ IPHONE: Заставляем Cloudinary отдать универсальный JPG вместо WebP
+    if (safeUrl.includes('f_auto')) {
+      safeUrl = safeUrl.replace('f_auto', 'f_jpg');
+    }
+    return safeUrl;
+  };
+
   const getCoverImage = (item) => {
-    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
-    if (item.imageUrl) return item.imageUrl;
+    if (item.imageUrls && item.imageUrls.length > 0) return getSafeUrl(item.imageUrls[0]);
+    if (item.imageUrl) return getSafeUrl(item.imageUrl);
     return null;
   };
 
   const getAllImages = (item) => {
     if (!item) return [];
-    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
-    if (item.imageUrl) return [item.imageUrl];
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls.map(getSafeUrl);
+    if (item.imageUrl) return [getSafeUrl(item.imageUrl)];
     return [];
   };
 
@@ -264,15 +277,22 @@ export default function PublicPortfolio() {
                     <Card.Section
                       style={{ position: "relative", overflow: "hidden", height: 280 }}
                     >
-                      {/* 🔥 SENIOR FIX: Используем стандартный <img> для надежности */}
+                      {/* 🔥 SENIOR FIX: referrerPolicy для обхода защит iPhone (ITP) */}
                       <img
-                        src={coverImage || "https://placehold.co/600x400?text=Изображение+не+найдено"}
+                        src={coverImage || "https://placehold.co/600x400?text=Нет+фото"}
                         alt={item.title}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                            e.target.onerror = null; 
+                            e.target.src = "https://placehold.co/600x400?text=Ошибка+загрузки";
+                        }}
                         style={{
                           width: "100%",
                           height: "100%",
                           objectFit: "cover",
                           transition: "transform 0.5s ease",
+                          backgroundColor: "#f1f3f5"
                         }}
                       />
 
@@ -366,9 +386,6 @@ export default function PublicPortfolio() {
         )}
       </Container>
 
-      {/* ========================================== */}
-      {/* FULLSCREEN LIGHTBOX */}
-      {/* ========================================== */}
       <Modal
         opened={!!selectedItem}
         onClose={closeLightbox}
@@ -380,7 +397,7 @@ export default function PublicPortfolio() {
           content: { backgroundColor: "#0f0f0f", color: "white" },
           body: {
             height: "100%",
-            minHeight: "100vh", // Гарантируем полную высоту
+            minHeight: "100vh",
             display: "flex",
             flexDirection: "column",
             padding: 0,
@@ -455,15 +472,21 @@ export default function PublicPortfolio() {
                 </ActionIcon>
               )}
 
-              {/* 🔥 SENIOR FIX: Настоящий, пуленепробиваемый HTML <img> вместо Mantine Image */}
+              {/* 🔥 SENIOR FIX: Добавлена политика реферрера для обхода блокировок */}
               <img
                 src={lightboxImages[currentImageIndex]}
                 alt={selectedItem.title}
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                onError={(e) => {
+                    e.target.onerror = null; 
+                    e.target.src = "https://placehold.co/800x600?text=Ошибка+загрузки";
+                }}
                 style={{
                   maxWidth: "100%",
                   maxHeight: "75vh",
                   objectFit: "contain",
-                  display: "block", // Важно для Safari
+                  display: "block",
                 }}
               />
 
@@ -504,6 +527,8 @@ export default function PublicPortfolio() {
                     <img
                       key={idx}
                       src={imgUrl}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
                       onClick={() => setCurrentImageIndex(idx)}
                       style={{
                         width: 60,
