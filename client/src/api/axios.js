@@ -3,15 +3,11 @@ import axios from 'axios';
 // ==========================================
 // 1. ИНТЕЛЛЕКТУАЛЬНАЯ КОНФИГУРАЦИЯ (СЕНЬОР-ХАК v3)
 // ==========================================
-const hostname = window.location.hostname;
 
 // Распознаем не только ПК, но и телефон в локальной Wi-Fi сети
-const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('172.');
 
 // 🔥 SENIOR FIX: Исправлен порт с 5000 на правильный 5005 (твой бекенд работает на 5005)
-export const API_URL = isLocalDev
-    ? (import.meta.env.VITE_API_URL || `http://${hostname}:5005/api`)
-    : (import.meta.env.VITE_API_URL || '/api');
+export const API_URL = meta.env.VITE_API_URL|| 'http://localhost:5005/api';
 
 // Экспортируем чистый домен бэкенда (без /api на конце)
 export const BASE_URL = API_URL.replace('/api', '');
@@ -84,7 +80,7 @@ export const deletePrice = (id) => API.delete(`/prices/${id}`);
 export const fetchPortfolio = () => API.get('/portfolio');
 export const addPortfolio = (formData) => API.post('/portfolio', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
-}); 
+});
 export const updatePortfolioItem = (id, data) => API.put(`/portfolio/${id}`, data);
 export const deletePortfolioItem = (id) => API.delete(`/portfolio/${id}`);
 
