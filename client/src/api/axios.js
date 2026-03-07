@@ -1,19 +1,19 @@
 import axios from 'axios';
 
 // ==========================================
-// 1. ИНТЕЛЛЕКТУАЛЬНАЯ КОНФИГУРАЦИЯ (СЕНЬОР-ХАК v2)
+// 1. ИНТЕЛЛЕКТУАЛЬНАЯ КОНФИГУРАЦИЯ (СЕНЬОР-ХАК v3)
 // ==========================================
 const hostname = window.location.hostname;
 
-// Распознаем не только ПК, но и телефон в локальной Wi-Fi сети (192.168.x.x)
+// Распознаем не только ПК, но и телефон в локальной Wi-Fi сети
 const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('172.');
 
-// Если зашли с телефона (например, 192.168.1.5), стучимся на этот же IP, порт бэкенда (5000)
+// 🔥 SENIOR FIX: Исправлен порт с 5000 на правильный 5005 (твой бекенд работает на 5005)
 export const API_URL = isLocalDev
-    ? (import.meta.env.VITE_API_URL || `http://${hostname}:5000/api`)
+    ? (import.meta.env.VITE_API_URL || `http://${hostname}:5005/api`)
     : (import.meta.env.VITE_API_URL || '/api');
 
-// Экспортируем чистый домен бэкенда для картинок (без /api на конце)
+// Экспортируем чистый домен бэкенда (без /api на конце)
 export const BASE_URL = API_URL.replace('/api', '');
 
 const API = axios.create({
@@ -82,9 +82,8 @@ export const updatePrice = (id, priceData) => API.put(`/prices/${id}`, priceData
 export const deletePrice = (id) => API.delete(`/prices/${id}`);
 
 export const fetchPortfolio = () => API.get('/portfolio');
-export const addPortfolio = (formData) => API.post('/portfolio', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-});
+// 🔥 SENIOR FIX: Убрали жесткие заголовки. Теперь браузер сам поставит правильный boundary!
+export const addPortfolio = (formData) => API.post('/portfolio', formData);
 export const updatePortfolioItem = (id, data) => API.put(`/portfolio/${id}`, data);
 export const deletePortfolioItem = (id) => API.delete(`/portfolio/${id}`);
 
