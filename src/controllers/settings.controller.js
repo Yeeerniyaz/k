@@ -1,7 +1,6 @@
 import prisma from '../server.js';
 import catchAsync from '../utils/catchAsync.js';
-import AppError from '../utils/AppError.js';
-
+import { AppError } from '../utils/AppError.js';
 // ==========================================
 // 1. READ: ПОЛУЧИТЬ НАСТРОЙКИ КАЛЬКУЛЯТОРА (Для витрины)
 // ==========================================
