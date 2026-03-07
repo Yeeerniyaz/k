@@ -5,7 +5,9 @@ import {
     getSettingByKey,
     deleteSetting
 } from '../controllers/settings.controller.js';
-import { protect, restrictTo } from '../middlewares/auth.middleware.js';
+
+// 🔥 FIX: restrictTo орнына authorize деп импорттаймыз
+import { protect, authorize } from '../middlewares/auth.middleware.js'; 
 
 const router = express.Router();
 
@@ -20,7 +22,7 @@ router.get('/calculator', getCalculatorSettings);
 // ==========================================
 // Включаем защиту: нужен токен и роль ADMIN
 router.use(protect);
-router.use(restrictTo('ADMIN'));
+router.use(authorize('ADMIN')); // 🔥 FIX: restrictTo орнына authorize қолданамыз
 
 // Сохранение / Обновление калькулятора
 router.post('/calculator', updateCalculatorSettings);
