@@ -26,14 +26,17 @@ model User {
 }
 
 // ==========================================
-// 2. ПОРТФОЛИО (То, что босс добавляет с телефона, кейсы из Instagram)
+// 2. ПОРТФОЛИО (Кейсы из Instagram, витрина)
 // ==========================================
 model Portfolio {
   id          String   @id @default(uuid())
   title       String   // "Вывеска для GLOBAL DENT"
   category    ServiceCategory // "BANNERS", "METAL_FRAMES" и т.д.
-  imageUrl    String   // Ссылка на фото
-  publicId    String?  // ДОБАВЛЕНО: ID для правильного удаления картинки из облака (Cloudinary)
+  
+  // 🔥 SENIOR UPDATE: Теперь это МАССИВЫ строк, чтобы хранить несколько фото!
+  imageUrls   String[] 
+  publicIds   String[] 
+  
   description String?
   isVisible   Boolean  @default(true) // Можно временно скрыть
   createdAt   DateTime @default(now())
@@ -60,21 +63,18 @@ model Order {
   hasEyelets  Boolean     @default(false) // Люверсы
   needsMount  Boolean     @default(false) // Нужен монтаж
   
-  // ДОБАВЛЕНО: Текстовое поле для сохранения сложных деталей из смарт-калькулятора (надбавки, опции)
-  description String?     
-  
+  description String?     // Текстовое поле для сохранения сложных деталей
   totalPrice  Int         // Итоговая цена в тенге
   status      OrderStatus @default(NEW)
   
-  // ДОБАВЛЕНО: Связь 1-ко-многим. Расходы, привязанные к этому заказу (себестоимость)
-  expenses    Expense[]   
+  expenses    Expense[]   // Расходы, привязанные к этому заказу (себестоимость)
   
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }
 
 // ==========================================
-// 4. НАСТРОЙКИ КАЛЬКУЛЯТОРА И СИСТЕМЫ (JSON) -> НОВЫЙ МОДУЛЬ
+// 4. НАСТРОЙКИ КАЛЬКУЛЯТОРА И СИСТЕМЫ (JSON)
 // ==========================================
 model Setting {
   id        String   @id @default(uuid())
@@ -84,7 +84,7 @@ model Setting {
 }
 
 // ==========================================
-// 5. ПРАЙС-ЛИСТ (БАЗОВЫЕ ЦЕНЫ ДЛЯ КАЛЬКУЛЯТОРА) -> НОВЫЙ МОДУЛЬ
+// 5. ПРАЙС-ЛИСТ (БАЗОВЫЕ ЦЕНЫ ДЛЯ КАЛЬКУЛЯТОРА)
 // ==========================================
 model Price {
   id        String   @id @default(uuid())
@@ -96,7 +96,7 @@ model Price {
 }
 
 // ==========================================
-// 6. ФИНАНСЫ (ОБЩИЕ РАСХОДЫ И РАСХОДЫ ПО ЗАКАЗАМ) -> НОВЫЙ МОДУЛЬ
+// 6. ФИНАНСЫ (ОБЩИЕ РАСХОДЫ И РАСХОДЫ ПО ЗАКАЗАМ)
 // ==========================================
 model Expense {
   id        String   @id @default(uuid())
@@ -105,7 +105,6 @@ model Expense {
   comment   String?
   date      DateTime @default(now())
   
-  // Если расход привязан к конкретному заказу, он связывается здесь
   orderId   String?
   order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
@@ -121,21 +120,21 @@ enum Role {
 
 enum OrderStatus {
   NEW         // Только упала заявка
-  PENDING     // ДОБАВЛЕНО: В ожидании / на согласовании (замер)
+  PENDING     // В ожидании / на согласовании (замер)
   IN_PROGRESS // В производстве
   READY       // Ждет отгрузки/монтажа
   COMPLETED   // Закрыт и оплачен
-  CANCELED    // ДОБАВЛЕНО: Отменен
+  CANCELED    // Отменен
 }
 
 // Категории услуг (взяты из реального прайса/инсты)
 enum ServiceCategory {
   BANNERS         // Баннеры, наружная реклама
-  LIGHTBOXES      // ДОБАВЛЕНО: Лайтбоксы
-  SIGNBOARDS      // ДОБАВЛЕНО: Вывески
+  LIGHTBOXES      // Лайтбоксы
+  SIGNBOARDS      // Вывески
   INTERIOR        // Оформление интерьера и экстерьера
   FIGURES_3D      // Объемные фигуры
   METAL_FRAMES    // Металлокаркасы
-  POS_MATERIALS   // ДОБАВЛЕНО: ПОС материалы
+  POS_MATERIALS   // ПОС материалы
   DESIGN_PRINT    // Дизайн и печать
 }
