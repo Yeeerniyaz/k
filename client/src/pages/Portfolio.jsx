@@ -20,6 +20,7 @@ import {
   Badge,
   Center,
   Stack,
+  Box,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -63,10 +64,12 @@ export default function Portfolio() {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
-  const [file, setFile] = useState(null);
+
+  // 🔥 SENIOR UPDATE: Массив для хранения нескольких файлов вместо одного
+  const [files, setFiles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Категории должны совпадать с теми, что мы используем на витрине
+  // Категории (используем те же, что и на витрине)
   const categoryOptions = [
     { value: "banners", label: "Баннеры" },
     { value: "lightboxes", label: "Лайтбоксы" },
@@ -85,10 +88,10 @@ export default function Portfolio() {
       setError(null);
       // Используем метод из axios.js
       const response = await apiFetchPortfolio();
-      setItems(response.data.data || []);
+      setItems(response.data?.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки портфолио:", err);
-      // 🔥 Senior Practice: Убрали фейковые данные. Пустой массив при ошибке.
+      // Убираем фейковые данные. Пустой массив при ошибке.
       setItems([]);
       setError(
         "Не удалось загрузить список работ. Проверьте соединение с сервером.",
@@ -98,6 +101,7 @@ export default function Portfolio() {
     }
   };
 
+  // Первичная загрузка данных при открытии страницы
   useEffect(() => {
     fetchPortfolio();
   }, []);
@@ -112,9 +116,10 @@ export default function Portfolio() {
         `${item.title || ""} ${item.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchTerm.toLowerCase());
 
-      // 2. Фильтр по категории
+      // 2. Фильтр по категории (нормализуем на случай разницы в регистре из БД)
+      const itemCat = item.category?.toLowerCase().replace("_", "-");
       const matchesCategory =
-        filterCategory === "ALL" ? true : item.category === filterCategory;
+        filterCategory === "ALL" ? true : itemCat === filterCategory;
 
       return matchesSearch && matchesCategory;
     })
@@ -136,7 +141,8 @@ export default function Portfolio() {
   // ==========================================
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!title || !category || !file) return;
+    // Проверка: обязательно название, категория и минимум 1 файл
+    if (!title || !category || files.length === 0) return;
 
     setIsSubmitting(true);
 
@@ -145,7 +151,11 @@ export default function Portfolio() {
     formData.append("title", title);
     formData.append("category", category);
     formData.append("description", description);
-    formData.append("image", file);
+
+    // 🔥 SENIOR UPDATE: Добавляем каждый выбранный файл в FormData с общим ключом 'images'
+    files.forEach((file) => {
+      formData.append("images", file);
+    });
 
     try {
       // Отправляем мультипарт-запрос через функцию axios.js
@@ -155,17 +165,17 @@ export default function Portfolio() {
       setTitle("");
       setCategory("");
       setDescription("");
-      setFile(null);
+      setFiles([]);
       close();
 
       // Обновляем список работ напрямую с сервера
       fetchPortfolio();
     } catch (err) {
       console.error("Ошибка при создании работы:", err);
-      // 🔥 Senior Update: Убрана локальная имитация создания объекта. Показываем реальную ошибку.
+      // Показываем реальную ошибку с бэкенда
       alert(
         err.response?.data?.message ||
-          "Ошибка при загрузке работы в облако. Возможно, файл слишком большой.",
+          "Ошибка при загрузке работы в облако. Возможно, файлы слишком большие.",
       );
     } finally {
       setIsSubmitting(false);
@@ -187,7 +197,6 @@ export default function Portfolio() {
       setItems((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
-      // 🔥 Senior Update: Убрана демо-имитация удаления.
       alert(
         err.response?.data?.message ||
           "Не удалось удалить работу. Убедитесь, что у вас есть права Администратора.",
@@ -195,10 +204,29 @@ export default function Portfolio() {
     }
   };
 
-  // Вспомогательная функция для красивого названия категории
+  // ==========================================
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+  // ==========================================
+  // Красивое название категории
   const getCategoryLabel = (val) => {
-    const cat = categoryOptions.find((c) => c.value === val);
+    const normalizedVal = val?.toLowerCase().replace("_", "-");
+    const cat = categoryOptions.find((c) => c.value === normalizedVal);
     return cat ? cat.label : val;
+  };
+
+  // 🔥 Извлекаем обложку (поддерживает и старый imageUrl, и новый массив imageUrls)
+  const getCoverImage = (item) => {
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
+    if (item.imageUrl) return item.imageUrl;
+    return null;
+  };
+
+  // Считаем общее количество картинок в проекте
+  const getAllImagesCount = (item) => {
+    if (item.imageUrls && item.imageUrls.length > 0)
+      return item.imageUrls.length;
+    if (item.imageUrl) return 1;
+    return 0;
   };
 
   return (
@@ -313,73 +341,90 @@ export default function Portfolio() {
         </Grid>
       ) : processedItems.length > 0 ? (
         <Grid gutter="md">
-          {processedItems.map((item) => (
-            <Grid.Col span={{ base: 12, sm: 6, md: 4, lg: 3 }} key={item.id}>
-              <Card
-                shadow="sm"
-                padding="lg"
-                radius="md"
-                withBorder
-                style={{
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <Card.Section style={{ position: "relative" }}>
-                  <Image
-                    src={item.imageUrl}
-                    height={200}
-                    alt={item.title}
-                    fallbackSrc="https://placehold.co/600x400?text=Нет+Изображения"
-                  />
-                  <Badge
-                    variant="filled"
-                    style={{
-                      position: "absolute",
-                      top: 10,
-                      right: 10,
-                      backgroundColor: "#1B2E3D",
-                    }}
-                  >
-                    {getCategoryLabel(item.category)}
-                  </Badge>
-                </Card.Section>
+          {processedItems.map((item) => {
+            const imgCount = getAllImagesCount(item);
 
-                <Group justify="space-between" mt="md" mb="xs">
-                  <Text
-                    fw={600}
-                    style={{ color: "#1B2E3D" }}
-                    lineClamp={1}
-                    title={item.title}
-                  >
-                    {item.title}
-                  </Text>
-                </Group>
-
-                <Text
-                  size="sm"
-                  c="dimmed"
-                  lineClamp={2}
-                  style={{ flexGrow: 1 }}
-                >
-                  {item.description || "Нет описания"}
-                </Text>
-
-                <Button
-                  variant="light"
-                  color="red"
-                  fullWidth
-                  mt="md"
+            return (
+              <Grid.Col span={{ base: 12, sm: 6, md: 4, lg: 3 }} key={item.id}>
+                <Card
+                  shadow="sm"
+                  padding="lg"
                   radius="md"
-                  leftSection={<IconTrash size={16} />}
-                  onClick={() => handleDelete(item.id)}
+                  withBorder
+                  style={{
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
                 >
-                  Удалить
-                </Button>
-              </Card>
-            </Grid.Col>
-          ))}
+                  <Card.Section style={{ position: "relative" }}>
+                    <Image
+                      src={getCoverImage(item)}
+                      height={200}
+                      alt={item.title}
+                      fallbackSrc="https://placehold.co/600x400?text=Нет+Изображения"
+                    />
+                    <Badge
+                      variant="filled"
+                      style={{
+                        position: "absolute",
+                        top: 10,
+                        right: 10,
+                        backgroundColor: "#1B2E3D",
+                      }}
+                    >
+                      {getCategoryLabel(item.category)}
+                    </Badge>
+
+                    {/* Если картинок больше 1, показываем индикатор в админке */}
+                    {imgCount > 1 && (
+                      <Badge
+                        variant="white"
+                        size="sm"
+                        leftSection={<IconPhoto size={12} />}
+                        style={{
+                          position: "absolute",
+                          bottom: 10,
+                          right: 10,
+                          boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+                          fontWeight: 700,
+                          color: "#1B2E3D",
+                        }}
+                      >
+                        +{imgCount - 1} фото
+                      </Badge>
+                    )}
+                  </Card.Section>
+
+                  <Box mt="md" mb="xs" style={{ flexGrow: 1 }}>
+                    <Text
+                      fw={600}
+                      style={{ color: "#1B2E3D" }}
+                      lineClamp={1}
+                      title={item.title}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text size="sm" c="dimmed" lineClamp={2} mt={5}>
+                      {item.description || "Нет описания"}
+                    </Text>
+                  </Box>
+
+                  <Button
+                    variant="light"
+                    color="red"
+                    fullWidth
+                    mt="md"
+                    radius="md"
+                    leftSection={<IconTrash size={16} />}
+                    onClick={() => handleDelete(item.id)}
+                  >
+                    Удалить
+                  </Button>
+                </Card>
+              </Grid.Col>
+            );
+          })}
         </Grid>
       ) : (
         <Paper withBorder p={60} radius="md" bg="white">
@@ -419,7 +464,7 @@ export default function Portfolio() {
       )}
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО СОЗДАНИЯ */}
+      {/* МОДАЛЬНОЕ ОКНО СОЗДАНИЯ РАБОТЫ */}
       {/* ========================================== */}
       <Modal
         opened={opened}
@@ -454,14 +499,17 @@ export default function Portfolio() {
               styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
             />
 
+            {/* 🔥 SENIOR UPDATE: FileInput теперь поддерживает Multiple файлов */}
             <FileInput
-              label="Фотография работы"
-              placeholder="Нажмите, чтобы выбрать файл"
+              label="Фотографии работы (можно выбрать несколько)"
+              placeholder="Нажмите, чтобы выбрать файлы (до 10 шт)"
               required
+              multiple
+              clearable
               accept="image/png,image/jpeg,image/webp"
               leftSection={<IconUpload size={16} />}
-              value={file}
-              onChange={setFile}
+              value={files}
+              onChange={setFiles}
               styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
             />
 
