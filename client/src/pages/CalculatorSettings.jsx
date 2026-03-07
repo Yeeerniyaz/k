@@ -36,7 +36,7 @@ import {
   IconChecklist,
   IconCopy,
   IconArrowUp,
-  IconArrowDown, // 🔥 Добавлены новые иконки для Enterprise фич
+  IconArrowDown,
 } from "@tabler/icons-react";
 
 // 🔥 Senior Update: Используем единый инстанс API из axios.js
@@ -72,6 +72,7 @@ export default function CalculatorSettings() {
       setLoading(true);
       setError(null);
 
+      // Загружаем актуальные цены для связи с формулами
       const pricesRes = await api.get("/prices");
       const loadedPrices = pricesRes.data.data || pricesRes.data || [];
       setPrices(
@@ -81,9 +82,10 @@ export default function CalculatorSettings() {
         })),
       );
 
+      // Загружаем сохраненную конфигурацию калькулятора
       const configRes = await api.get("/settings/calculator");
       if (configRes.data && configRes.data.config) {
-        // Убеждаемся, что у всех есть массив addons
+        // Убеждаемся, что у всех есть массив addons (доп. опции)
         const loadedConfigs = configRes.data.config.map((c) => ({
           ...c,
           addons: c.addons || [],
@@ -94,7 +96,7 @@ export default function CalculatorSettings() {
       }
     } catch (err) {
       console.error("Ошибка загрузки настроек:", err);
-      // 🔥 Senior Practice: Никаких фейковых данных!
+      // 🔥 Senior Practice: Никаких фейковых данных! Если сервер недоступен, ставим пустой массив
       setConfigs([]);
       setError(
         "Не удалось загрузить настройки калькулятора. Проверьте соединение с сервером.",
@@ -109,7 +111,7 @@ export default function CalculatorSettings() {
   }, []);
 
   // ==========================================
-  // ФУНКЦИИ КОНСТРУКТОРА: БЛОКИ
+  // ФУНКЦИИ КОНСТРУКТОРА: УПРАВЛЕНИЕ БЛОКАМИ
   // ==========================================
   const handleAddConfig = () => {
     setConfigs([
@@ -121,7 +123,7 @@ export default function CalculatorSettings() {
         customFormula: "",
         fields: [{ name: "val1", label: "Поле 1" }],
         linkedPrices: [],
-        addons: [], // 🔥 Добавили поддержку доп. опций
+        addons: [],
       },
     ]);
   };
@@ -191,7 +193,7 @@ export default function CalculatorSettings() {
   };
 
   // ==========================================
-  // ФУНКЦИИ КОНСТРУКТОРА: ДОП. ОПЦИИ (ADDONS) 🔥 НОВОЕ
+  // ФУНКЦИИ КОНСТРУКТОРА: ДОП. ОПЦИИ (ADDONS)
   // ==========================================
   const handleAddAddon = (configId) => {
     setConfigs(
@@ -244,7 +246,7 @@ export default function CalculatorSettings() {
   };
 
   // ==========================================
-  // СОРТИРОВКА БЛОКОВ КАЛЬКУЛЯТОРА
+  // СОРТИРОВКА И ДУБЛИРОВАНИЕ БЛОКОВ
   // ==========================================
   const moveConfigUp = (index) => {
     if (index === 0) return;
@@ -264,7 +266,6 @@ export default function CalculatorSettings() {
     setConfigs(newConfigs);
   };
 
-  // ДУБЛИРОВАНИЕ БЛОКА
   const handleDuplicateConfig = (config) => {
     const duplicatedConfig = {
       ...config,
@@ -284,10 +285,10 @@ export default function CalculatorSettings() {
       alert("Сложная архитектура калькулятора успешно сохранена!");
     } catch (err) {
       console.error("Ошибка сохранения:", err);
-      // 🔥 Senior Update: Показываем реальную ошибку
+      // 🔥 Senior Update: Показываем реальную ошибку с сервера
       alert(
         err.response?.data?.message ||
-          "Не удалось сохранить настройки. Проверьте соединение с сервером.",
+          "Не удалось сохранить настройки калькулятора. Проверьте соединение с сервером.",
       );
     } finally {
       setIsSaving(false);
@@ -639,7 +640,7 @@ export default function CalculatorSettings() {
                       )}
                     </Paper>
 
-                    {/* ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ (ЧЕКБОКСЫ) - 🔥 НОВЫЙ БЛОК */}
+                    {/* ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ (ЧЕКБОКСЫ) */}
                     <Paper
                       p="md"
                       withBorder
