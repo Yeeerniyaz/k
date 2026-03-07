@@ -26,8 +26,8 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
-// 🔥 SENIOR FIX: Импортируем API_URL чтобы обращаться к нашему VPS прокси
-import { fetchPortfolio as apiFetchPortfolio, API_URL } from "../api/axios.js";
+// Убираем API_URL, так как прокси нам не нужен
+import { fetchPortfolio as apiFetchPortfolio } from "../api/axios.js";
 
 export default function PublicPortfolio() {
   const navigate = useNavigate();
@@ -77,7 +77,7 @@ export default function PublicPortfolio() {
   }, []);
 
   // ==========================================
-  // 🔥 СЕНЬОРСКИЕ ФУНКЦИИ (ПРОКСИРОВАНИЕ ФОТО)
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
   // ==========================================
   const getCategoryLabel = (val) => {
     const cat = categories.find(
@@ -87,27 +87,16 @@ export default function PublicPortfolio() {
   };
 
   const getCoverImage = (item) => {
-    let url = null;
-    if (item.imageUrls && item.imageUrls.length > 0) url = item.imageUrls[0];
-    else if (item.imageUrl) url = item.imageUrl;
-
-    if (url) {
-      // 🔥 Пропускаем через наш VPS сервер, обходя блокировки Теле2/Kcell!
-      return `${API_URL}/portfolio/proxy?url=${encodeURIComponent(url)}`;
-    }
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
+    if (item.imageUrl) return item.imageUrl;
     return null;
   };
 
   const getAllImages = (item) => {
     if (!item) return [];
-    let urls = [];
-    if (item.imageUrls && item.imageUrls.length > 0) urls = item.imageUrls;
-    else if (item.imageUrl) urls = [item.imageUrl];
-
-    // 🔥 Пропускаем все фото через прокси
-    return urls.map(
-      (url) => `${API_URL}/portfolio/proxy?url=${encodeURIComponent(url)}`,
-    );
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
+    if (item.imageUrl) return [item.imageUrl];
+    return [];
   };
 
   const handleItemClick = (item) => {
@@ -273,20 +262,18 @@ export default function PublicPortfolio() {
                     onClick={() => handleItemClick(item)}
                   >
                     <Card.Section
-                      style={{ position: "relative", overflow: "hidden" }}
+                      style={{ position: "relative", overflow: "hidden", height: 280 }}
                     >
-                      <Image
-                        src={coverImage}
-                        height={280}
+                      {/* 🔥 SENIOR FIX: Используем стандартный <img> для надежности */}
+                      <img
+                        src={coverImage || "https://placehold.co/600x400?text=Изображение+не+найдено"}
                         alt={item.title}
-                        fallbackSrc="https://placehold.co/600x400?text=Загрузка..."
-                        style={{ transition: "transform 0.5s ease" }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.transform = "scale(1.05)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.transform = "scale(1)")
-                        }
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          transition: "transform 0.5s ease",
+                        }}
                       />
 
                       <Badge
@@ -379,6 +366,9 @@ export default function PublicPortfolio() {
         )}
       </Container>
 
+      {/* ========================================== */}
+      {/* FULLSCREEN LIGHTBOX */}
+      {/* ========================================== */}
       <Modal
         opened={!!selectedItem}
         onClose={closeLightbox}
@@ -389,7 +379,8 @@ export default function PublicPortfolio() {
           inner: { padding: 0 },
           content: { backgroundColor: "#0f0f0f", color: "white" },
           body: {
-            height: "100dvh",
+            height: "100%",
+            minHeight: "100vh", // Гарантируем полную высоту
             display: "flex",
             flexDirection: "column",
             padding: 0,
@@ -435,11 +426,10 @@ export default function PublicPortfolio() {
             <Box
               style={{
                 flex: 1,
-                minHeight: 0,
-                position: "relative",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                position: "relative",
                 overflow: "hidden",
                 padding: "0 16px",
               }}
@@ -465,14 +455,16 @@ export default function PublicPortfolio() {
                 </ActionIcon>
               )}
 
-              <Image
+              {/* 🔥 SENIOR FIX: Настоящий, пуленепробиваемый HTML <img> вместо Mantine Image */}
+              <img
                 src={lightboxImages[currentImageIndex]}
                 alt={selectedItem.title}
-                fallbackSrc="https://placehold.co/800x600?text=Загрузка..."
-                h="100%"
-                w="100%"
-                fit="contain"
-                style={{ transition: "opacity 0.2s ease" }}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "75vh",
+                  objectFit: "contain",
+                  display: "block", // Важно для Safari
+                }}
               />
 
               {lightboxImages.length > 1 && (
@@ -509,14 +501,14 @@ export default function PublicPortfolio() {
               >
                 <Group gap="sm" style={{ flexWrap: "nowrap" }}>
                   {lightboxImages.map((imgUrl, idx) => (
-                    <Image
+                    <img
                       key={idx}
                       src={imgUrl}
-                      w={60}
-                      h={60}
-                      radius="md"
                       onClick={() => setCurrentImageIndex(idx)}
                       style={{
+                        width: 60,
+                        height: 60,
+                        borderRadius: 8,
                         objectFit: "cover",
                         cursor: "pointer",
                         border:
@@ -526,6 +518,7 @@ export default function PublicPortfolio() {
                         opacity: currentImageIndex === idx ? 1 : 0.5,
                         transition: "all 0.2s ease",
                       }}
+                      alt="Thumbnail"
                     />
                   ))}
                 </Group>
