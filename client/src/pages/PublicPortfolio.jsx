@@ -396,7 +396,9 @@ export default function PublicPortfolio() {
           inner: { padding: 0 },
           content: { backgroundColor: "#0f0f0f", color: "white" },
           body: {
-            height: "100vh",
+            // 🔥 SENIOR BUGFIX ДЛЯ IPHONE SAFARI:
+            // Используем 100dvh (dynamic viewport height), чтобы адресная строка не закрывала контент
+            height: "100dvh",
             display: "flex",
             flexDirection: "column",
             padding: 0,
@@ -443,7 +445,10 @@ export default function PublicPortfolio() {
             {/* ЦЕНТРАЛЬНАЯ ЗОНА: Основное фото и стрелки */}
             <Box
               style={{
-                flexGrow: 1,
+                // 🔥 SENIOR BUGFIX ДЛЯ IPHONE SAFARI:
+                // minHeight: 0 решает баг схлопывания флексбоксов, когда картинка исчезала.
+                flex: 1,
+                minHeight: 0,
                 position: "relative",
                 display: "flex",
                 alignItems: "center",
@@ -473,16 +478,15 @@ export default function PublicPortfolio() {
                 </ActionIcon>
               )}
 
+              {/* 🔥 Используем жесткие параметры отображения картинки, чтобы Safari не тупил */}
               <Image
                 src={lightboxImages[currentImageIndex]}
                 alt={selectedItem.title}
                 fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
-                style={{
-                  maxHeight: "75vh",
-                  maxWidth: "100%",
-                  objectFit: "contain",
-                  transition: "opacity 0.2s ease",
-                }}
+                h="100%"
+                w="100%"
+                fit="contain"
+                style={{ transition: "opacity 0.2s ease" }}
               />
 
               {lightboxImages.length > 1 && (
