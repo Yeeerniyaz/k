@@ -15,7 +15,7 @@ import financeRoutes from './routes/finance.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 
-// 🔥 СЕНЬОРСКОЕ ДОБАВЛЕНИЕ: Импортируем наш глобальный перехватчик ошибок
+// Импортируем наш глобальный перехватчик ошибок
 import { errorHandler } from './middlewares/error.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,9 +27,24 @@ const app = express();
 // 1. ГЛОБАЛЬНЫЕ MIDDLEWARES (SENIOR LEVEL)
 // ==========================================
 
-// Защита HTTP заголовков
+// 🔥 SENIOR FIX: Настраиваем Content Security Policy (CSP)
+// Разрешаем загрузку картинок с Cloudinary и скриптов от Cloudflare
 app.use(helmet({
     crossOriginResourcePolicy: false,
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            // Разрешаем наши внутренние скрипты и аналитику Cloudflare
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"],
+            // Разрешаем загружать картинки с Cloudinary и заглушки placehold.co
+            imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://placehold.co"],
+            // Разрешаем гугл-шрифты
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+            // Разрешаем запросы к API Cloudinary (если нужно)
+            connectSrc: ["'self'", "https://api.cloudinary.com", "https://res.cloudinary.com"],
+        },
+    },
 }));
 
 // CORS для связи с React
@@ -96,8 +111,7 @@ app.use((req, res, next) => {
     next(err);
 });
 
-// 🔥 СЕНЬОРСКАЯ ПРАКТИКА: Подключаем централизованный обработчик ошибок
-// Теперь все ошибки из контроллеров (пойманные через catchAsync) стекаются сюда
+// Подключаем централизованный обработчик ошибок
 app.use(errorHandler);
 
 export default app;
