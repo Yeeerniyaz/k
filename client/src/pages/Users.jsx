@@ -18,6 +18,7 @@ import {
   Center,
   Stack,
   Divider,
+  Box,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -248,7 +249,7 @@ export default function Users() {
       )}
 
       {/* ========================================== */}
-      {/* ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ */}
+      {/* ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ (С АДАПТИВОМ ДЛЯ МОБИЛОК) */}
       {/* ========================================== */}
       <Paper
         withBorder
@@ -264,123 +265,128 @@ export default function Users() {
             <Skeleton height={40} />
           </div>
         ) : users.length > 0 ? (
-          <Table
-            striped
-            highlightOnHover
-            verticalSpacing="md"
-            horizontalSpacing="lg"
-          >
-            <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-              <Table.Tr>
-                <Table.Th style={{ color: "#1B2E3D" }}>Сотрудник</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Контакты</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Роль</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>
-                  Дата добавления
-                </Table.Th>
-                <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                  Действия
-                </Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {users.map((user) => (
-                <Table.Tr key={user.id}>
-                  {/* Имя */}
-                  <Table.Td>
-                    <Group gap="sm">
-                      <Center
-                        w={36}
-                        h={36}
-                        bg="#f1f3f5"
-                        style={{ borderRadius: "50%" }}
-                      >
-                        {user.role === "ADMIN" ? (
-                          <IconShieldLock size={18} color="#1B2E3D" />
-                        ) : (
-                          <IconUser size={18} color="#868e96" />
-                        )}
-                      </Center>
-                      <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
-                        {user.name}
-                      </Text>
-                    </Group>
-                  </Table.Td>
-
-                  {/* Контакты (Email + Телефон) */}
-                  <Table.Td>
-                    <Text size="sm">{user.email}</Text>
-                    {user.phone && (
-                      <Text
-                        size="xs"
-                        c="dimmed"
-                        mt={2}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
-                      >
-                        <IconPhone size={12} /> {user.phone}
-                      </Text>
-                    )}
-                  </Table.Td>
-
-                  {/* Роль */}
-                  <Table.Td>
-                    {user.role === "ADMIN" ? (
-                      <Badge color="red" variant="light">
-                        Администратор
-                      </Badge>
-                    ) : (
-                      <Badge
-                        color="gray"
-                        variant="light"
-                        style={{ color: "#1B2E3D" }}
-                      >
-                        Менеджер
-                      </Badge>
-                    )}
-                  </Table.Td>
-
-                  {/* Дата */}
-                  <Table.Td>
-                    <Text size="sm" c="dimmed">
-                      {formatDate(user.createdAt)}
-                    </Text>
-                  </Table.Td>
-
-                  {/* Действия */}
-                  <Table.Td style={{ textAlign: "right" }}>
-                    <Group gap="xs" justify="flex-end">
-                      <Tooltip label="Редактировать профиль и пароль">
-                        <ActionIcon
-                          variant="light"
-                          color="blue"
-                          onClick={() => handleOpenModal(user)}
+          <Box style={{ overflowX: "auto" }}>
+            <Table
+              striped
+              highlightOnHover
+              verticalSpacing="md"
+              horizontalSpacing="lg"
+              style={{ minWidth: 800 }}
+            >
+              <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                <Table.Tr>
+                  <Table.Th style={{ color: "#1B2E3D" }}>Сотрудник</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>Контакты</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>Роль</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>
+                    Дата добавления
+                  </Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                    Действия
+                  </Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {users.map((user) => (
+                  <Table.Tr key={user.id}>
+                    {/* Имя */}
+                    <Table.Td>
+                      <Group gap="sm">
+                        <Center
+                          w={36}
+                          h={36}
+                          bg="#f1f3f5"
+                          style={{ borderRadius: "50%" }}
                         >
-                          <IconEdit size={16} stroke={1.5} />
-                        </ActionIcon>
-                      </Tooltip>
+                          {user.role === "ADMIN" ? (
+                            <IconShieldLock size={18} color="#1B2E3D" />
+                          ) : (
+                            <IconUser size={18} color="#868e96" />
+                          )}
+                        </Center>
+                        <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
+                          {user.name}
+                        </Text>
+                      </Group>
+                    </Table.Td>
 
-                      {/* УДАЛЕНИЕ ДОСТУПНО ТОЛЬКО ДЛЯ МЕНЕДЖЕРОВ */}
-                      {user.role !== "ADMIN" && (
-                        <Tooltip label="Удалить доступ">
+                    {/* Контакты (Email + Телефон) */}
+                    <Table.Td>
+                      <Text size="sm">{user.email}</Text>
+                      {user.phone && (
+                        <Text
+                          size="xs"
+                          c="dimmed"
+                          mt={2}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <IconPhone size={12} /> {user.phone}
+                        </Text>
+                      )}
+                    </Table.Td>
+
+                    {/* Роль */}
+                    <Table.Td>
+                      {user.role === "ADMIN" ? (
+                        <Badge color="red" variant="light">
+                          Администратор
+                        </Badge>
+                      ) : (
+                        <Badge
+                          color="gray"
+                          variant="light"
+                          style={{ color: "#1B2E3D" }}
+                        >
+                          Менеджер
+                        </Badge>
+                      )}
+                    </Table.Td>
+
+                    {/* Дата */}
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">
+                        {formatDate(user.createdAt)}
+                      </Text>
+                    </Table.Td>
+
+                    {/* Действия */}
+                    <Table.Td style={{ textAlign: "right" }}>
+                      <Group gap="xs" justify="flex-end">
+                        <Tooltip label="Редактировать профиль и пароль">
                           <ActionIcon
                             variant="light"
-                            color="red"
-                            onClick={() => handleDeleteUser(user.id, user.role)}
+                            color="blue"
+                            onClick={() => handleOpenModal(user)}
                           >
-                            <IconTrash size={16} stroke={1.5} />
+                            <IconEdit size={16} stroke={1.5} />
                           </ActionIcon>
                         </Tooltip>
-                      )}
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+
+                        {/* УДАЛЕНИЕ ДОСТУПНО ТОЛЬКО ДЛЯ МЕНЕДЖЕРОВ */}
+                        {user.role !== "ADMIN" && (
+                          <Tooltip label="Удалить доступ">
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              onClick={() =>
+                                handleDeleteUser(user.id, user.role)
+                              }
+                            >
+                              <IconTrash size={16} stroke={1.5} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Box>
         ) : (
           <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
             <IconUser size={48} color="#e0e0e0" stroke={1.5} />

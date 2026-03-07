@@ -19,6 +19,7 @@ import {
   Button,
   Progress,
   Tooltip,
+  Select,
 } from "@mantine/core";
 import {
   IconShoppingCart,
@@ -33,10 +34,11 @@ import {
   IconFilter,
   IconReceipt2,
   IconBuildingSkyscraper,
+  IconClock,
 } from "@tabler/icons-react";
 
 // 🔥 Senior Update: Импортируем из единого axios.js
-import API, { fetchDashboardStats } from "../api/axios.js";
+import { fetchDashboardStats } from "../api/axios.js";
 
 export default function Dashboard() {
   // ==========================================
@@ -48,6 +50,7 @@ export default function Dashboard() {
   // ФИЛЬТРЫ ПО ДАТЕ
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [preset, setPreset] = useState("all"); // Быстрые фильтры
 
   // Инициализация структуры данных (изначально всё по нулям - CLEAN DATA)
   const [stats, setStats] = useState({
@@ -63,6 +66,27 @@ export default function Dashboard() {
   });
 
   // ==========================================
+  // БИЗНЕС-ЛОГИКА: БЫСТРЫЕ ФИЛЬТРЫ
+  // ==========================================
+  const handlePresetChange = (value) => {
+    setPreset(value);
+    const today = new Date();
+    
+    if (value === "today") {
+      const dateStr = today.toISOString().split("T")[0];
+      setDateFrom(dateStr);
+      setDateTo(dateStr);
+    } else if (value === "month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      setDateFrom(firstDay.toISOString().split("T")[0]);
+      setDateTo(today.toISOString().split("T")[0]);
+    } else {
+      setDateFrom("");
+      setDateTo("");
+    }
+  };
+
+  // ==========================================
   // МЕТОД ЗАГРУЗКИ АНАЛИТИКИ (REAL DATA ONLY)
   // ==========================================
   const fetchAnalytics = async () => {
@@ -75,10 +99,11 @@ export default function Dashboard() {
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
 
-      // Используем новую функцию из axios.js
+      // Используем функцию из axios.js
       const response = await fetchDashboardStats(params);
 
-      if (response.data && response.data.success) {
+      // 🔥 Senior Fix: Проверяем и success, и status, так как API может отдавать разные форматы
+      if (response.data && (response.data.success || response.data.status === 'success')) {
         const data = response.data.data;
 
         // Расчет агрегированных данных на стороне клиента (для надежности)
@@ -125,10 +150,11 @@ export default function Dashboard() {
     }
   };
 
-  // Эффект первичной инициализации
+  // Эффект первичной инициализации и реакции на изменение быстрых фильтров
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset]);
 
   // ==========================================
   // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ РЕНДЕРИНГА
@@ -140,7 +166,7 @@ export default function Dashboard() {
       CANCELED: { label: "Отменен", color: "red" },
       NEW: { label: "Новый (Лид)", color: "blue" },
     };
-    const config = statusMap[status] || { label: status, color: "gray" };
+    const config = statusMap[status] || { label: status || "Неизвестно", color: "gray" };
     return (
       <Badge color={config.color} variant="light">
         {config.label}
@@ -150,7 +176,13 @@ export default function Dashboard() {
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("ru-RU");
+    return new Date(dateString).toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // КОНФИГУРАЦИЯ ФИНАНСОВЫХ КАРТОЧЕК
@@ -226,20 +258,39 @@ export default function Dashboard() {
 
       {/* ФИЛЬТРАЦИЯ */}
       <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
-        <Group justify="space-between" align="flex-end">
+        <Group justify="space-between" align="flex-end" wrap="wrap">
           <Group align="flex-end">
+            <Select
+              label="Быстрый период"
+              placeholder="Выберите"
+              data={[
+                { value: "all", label: "За все время" },
+                { value: "today", label: "Сегодня" },
+                { value: "month", label: "Текущий месяц" },
+              ]}
+              value={preset}
+              onChange={handlePresetChange}
+              leftSection={<IconClock size={16} />}
+              style={{ width: 180 }}
+            />
             <TextInput
               type="date"
               label="С даты"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.currentTarget.value)}
+              onChange={(e) => {
+                setDateFrom(e.currentTarget.value);
+                setPreset(null); // Сбрасываем пресет при ручном вводе
+              }}
               leftSection={<IconCalendarEvent size={16} />}
             />
             <TextInput
               type="date"
               label="По дату"
               value={dateTo}
-              onChange={(e) => setDateTo(e.currentTarget.value)}
+              onChange={(e) => {
+                setDateTo(e.currentTarget.value);
+                setPreset(null);
+              }}
               leftSection={<IconCalendarEvent size={16} />}
             />
             <Button
@@ -449,43 +500,46 @@ export default function Dashboard() {
                 <Skeleton height={40} />
               </Box>
             ) : stats.recentOrders.length > 0 ? (
-              <Table
-                striped
-                highlightOnHover
-                verticalSpacing="md"
-                horizontalSpacing="md"
-              >
-                <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-                  <Table.Tr>
-                    <Table.Th>Дата</Table.Th>
-                    <Table.Th>Клиент</Table.Th>
-                    <Table.Th>Статус</Table.Th>
-                    <Table.Th ta="right">Сумма</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {stats.recentOrders.map((order) => (
-                    <Table.Tr key={order.id}>
-                      <Table.Td c="dimmed" fz="sm">
-                        {formatDate(order.date)}
-                      </Table.Td>
-                      <Table.Td fw={500} style={{ color: "#1B2E3D" }}>
-                        {order.clientName || "Без имени"}
-                      </Table.Td>
-                      <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
-                      <Table.Td
-                        ta="right"
-                        fw={600}
-                        style={{ color: "#1B2E3D" }}
-                      >
-                        {order.price
-                          ? `${order.price.toLocaleString("ru-RU")} ₸`
-                          : "-"}
-                      </Table.Td>
+              <Box style={{ overflowX: "auto" }}>
+                <Table
+                  striped
+                  highlightOnHover
+                  verticalSpacing="md"
+                  horizontalSpacing="md"
+                  style={{ minWidth: 600 }}
+                >
+                  <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                    <Table.Tr>
+                      <Table.Th>Дата</Table.Th>
+                      <Table.Th>Клиент</Table.Th>
+                      <Table.Th>Статус</Table.Th>
+                      <Table.Th ta="right">Сумма</Table.Th>
                     </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {stats.recentOrders.map((order) => (
+                      <Table.Tr key={order.id}>
+                        <Table.Td c="dimmed" fz="sm">
+                          {formatDate(order.createdAt || order.date)}
+                        </Table.Td>
+                        <Table.Td fw={500} style={{ color: "#1B2E3D" }}>
+                          {order.customerName || order.clientName || "Без имени"}
+                        </Table.Td>
+                        <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
+                        <Table.Td
+                          ta="right"
+                          fw={600}
+                          style={{ color: "#1B2E3D" }}
+                        >
+                          {order.totalPrice || order.price
+                            ? `${(order.totalPrice || order.price).toLocaleString("ru-RU")} ₸`
+                            : "-"}
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Box>
             ) : (
               <Center py="xl" style={{ flexDirection: "column" }}>
                 <IconShoppingCart size={40} color="#e0e0e0" />

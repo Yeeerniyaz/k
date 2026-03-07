@@ -18,6 +18,7 @@ import {
   Stack,
   Grid,
   Select,
+  Box,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -288,7 +289,7 @@ export default function Prices() {
       </Paper>
 
       {/* ========================================== */}
-      {/* ТАБЛИЦА ПРАЙС-ЛИСТА */}
+      {/* ТАБЛИЦА ПРАЙС-ЛИСТА (С АДАПТИВОМ ДЛЯ МОБИЛОК) */}
       {/* ========================================== */}
       <Paper
         withBorder
@@ -304,74 +305,77 @@ export default function Prices() {
             <Skeleton height={40} />
           </div>
         ) : processedPrices.length > 0 ? (
-          <Table
-            striped
-            highlightOnHover
-            verticalSpacing="md"
-            horizontalSpacing="lg"
-          >
-            <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-              <Table.Tr>
-                <Table.Th style={{ color: "#1B2E3D" }}>
-                  Наименование услуги / материала
-                </Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Единица изм.</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                  Базовая стоимость
-                </Table.Th>
-                <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                  Действия
-                </Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {processedPrices.map((item) => (
-                <Table.Tr key={item.id}>
-                  <Table.Td>
-                    <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
-                      {item.service}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge
-                      color="gray"
-                      variant="light"
-                      style={{ color: "#1B2E3D" }}
-                    >
-                      {item.unit}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td style={{ textAlign: "right" }}>
-                    <Text fw={700} style={{ color: "#1B2E3D" }}>
-                      {item.price.toLocaleString("ru-RU")} ₸
-                    </Text>
-                  </Table.Td>
-                  <Table.Td style={{ textAlign: "right" }}>
-                    <Group gap="xs" justify="flex-end">
-                      <Tooltip label="Редактировать цену">
-                        <ActionIcon
-                          variant="light"
-                          color="blue"
-                          onClick={() => handleOpenModal(item)}
-                        >
-                          <IconEdit size={16} stroke={1.5} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Удалить из прайса">
-                        <ActionIcon
-                          variant="light"
-                          color="red"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <IconTrash size={16} stroke={1.5} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Table.Td>
+          <Box style={{ overflowX: "auto" }}>
+            <Table
+              striped
+              highlightOnHover
+              verticalSpacing="md"
+              horizontalSpacing="lg"
+              style={{ minWidth: 700 }}
+            >
+              <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                <Table.Tr>
+                  <Table.Th style={{ color: "#1B2E3D" }}>
+                    Наименование услуги / материала
+                  </Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>Единица изм.</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                    Базовая стоимость
+                  </Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                    Действия
+                  </Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {processedPrices.map((item) => (
+                  <Table.Tr key={item.id}>
+                    <Table.Td>
+                      <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
+                        {item.service}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge
+                        color="gray"
+                        variant="light"
+                        style={{ color: "#1B2E3D" }}
+                      >
+                        {item.unit}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td style={{ textAlign: "right" }}>
+                      <Text fw={700} style={{ color: "#1B2E3D" }}>
+                        {item.price.toLocaleString("ru-RU")} ₸
+                      </Text>
+                    </Table.Td>
+                    <Table.Td style={{ textAlign: "right" }}>
+                      <Group gap="xs" justify="flex-end">
+                        <Tooltip label="Редактировать цену">
+                          <ActionIcon
+                            variant="light"
+                            color="blue"
+                            onClick={() => handleOpenModal(item)}
+                          >
+                            <IconEdit size={16} stroke={1.5} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Удалить из прайса">
+                          <ActionIcon
+                            variant="light"
+                            color="red"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            <IconTrash size={16} stroke={1.5} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Box>
         ) : (
           <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
             <IconReportMoney size={48} color="#e0e0e0" stroke={1.5} />

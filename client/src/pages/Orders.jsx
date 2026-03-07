@@ -21,6 +21,7 @@ import {
   Grid,
   Textarea,
   ThemeIcon,
+  Box,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -473,87 +474,90 @@ export default function Orders() {
             <Skeleton height={40} />
           </div>
         ) : processedOrders.length > 0 ? (
-          <Table
-            striped
-            highlightOnHover
-            verticalSpacing="md"
-            horizontalSpacing="lg"
-          >
-            <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-              <Table.Tr>
-                <Table.Th style={{ color: "#1B2E3D" }}>ID / Дата</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Клиент</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>ТЗ / Описание</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Статус</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Смета</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                  Действия
-                </Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {processedOrders.map((order) => (
-                <Table.Tr key={order.id}>
-                  <Table.Td>
-                    <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
-                      {order.id.slice(0, 8).toUpperCase()}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {formatDate(order.createdAt)}
-                    </Text>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text fw={500} size="sm" style={{ color: "#1B2E3D" }}>
-                      {order.customerName || order.clientName || "Без имени"}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {order.phone || order.clientPhone || "Нет телефона"}
-                    </Text>
-                  </Table.Td>
-
-                  <Table.Td>
-                    <Text size="sm" lineClamp={2} maw={280}>
-                      {order.description || "Нет описания"}
-                    </Text>
-                  </Table.Td>
-
-                  <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
-
-                  <Table.Td>
-                    <Text fw={700} size="sm" style={{ color: "#1B2E3D" }}>
-                      {order.price || order.totalPrice
-                        ? `${(order.price || order.totalPrice).toLocaleString("ru-RU")} ₸`
-                        : "Смета не готова"}
-                    </Text>
-                  </Table.Td>
-
-                  <Table.Td style={{ textAlign: "right" }}>
-                    <Group gap="xs" justify="flex-end">
-                      <Tooltip label="Управление финансами и статусом">
-                        <ActionIcon
-                          variant="light"
-                          color="blue"
-                          onClick={() => handleEditClick(order)}
-                        >
-                          <IconEdit size={16} stroke={1.5} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Удалить заказ">
-                        <ActionIcon
-                          variant="light"
-                          color="red"
-                          onClick={() => handleDeleteOrder(order.id)}
-                        >
-                          <IconTrash size={16} stroke={1.5} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Table.Td>
+          <Box style={{ overflowX: "auto" }}>
+            <Table
+              striped
+              highlightOnHover
+              verticalSpacing="md"
+              horizontalSpacing="lg"
+              style={{ minWidth: 1000 }}
+            >
+              <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                <Table.Tr>
+                  <Table.Th style={{ color: "#1B2E3D" }}>ID / Дата</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>Клиент</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>ТЗ / Описание</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>Статус</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D" }}>Смета</Table.Th>
+                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                    Действия
+                  </Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {processedOrders.map((order) => (
+                  <Table.Tr key={order.id}>
+                    <Table.Td>
+                      <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
+                        {order.id.slice(0, 8).toUpperCase()}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {formatDate(order.createdAt)}
+                      </Text>
+                    </Table.Td>
+
+                    <Table.Td>
+                      <Text fw={500} size="sm" style={{ color: "#1B2E3D" }}>
+                        {order.customerName || order.clientName || "Без имени"}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {order.phone || order.clientPhone || "Нет телефона"}
+                      </Text>
+                    </Table.Td>
+
+                    <Table.Td>
+                      <Text size="sm" lineClamp={2} maw={280}>
+                        {order.description || "Нет описания"}
+                      </Text>
+                    </Table.Td>
+
+                    <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
+
+                    <Table.Td>
+                      <Text fw={700} size="sm" style={{ color: "#1B2E3D" }}>
+                        {order.price || order.totalPrice
+                          ? `${(order.price || order.totalPrice).toLocaleString("ru-RU")} ₸`
+                          : "Смета не готова"}
+                      </Text>
+                    </Table.Td>
+
+                    <Table.Td style={{ textAlign: "right" }}>
+                      <Group gap="xs" justify="flex-end">
+                        <Tooltip label="Управление финансами и статусом">
+                          <ActionIcon
+                            variant="light"
+                            color="blue"
+                            onClick={() => handleEditClick(order)}
+                          >
+                            <IconEdit size={16} stroke={1.5} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Удалить заказ">
+                          <ActionIcon
+                            variant="light"
+                            color="red"
+                            onClick={() => handleDeleteOrder(order.id)}
+                          >
+                            <IconTrash size={16} stroke={1.5} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Box>
         ) : (
           <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
             <Text size="lg" fw={500} style={{ color: "#1B2E3D" }}>
