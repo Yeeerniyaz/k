@@ -35,7 +35,7 @@ import {
   IconBuildingSkyscraper,
 } from "@tabler/icons-react";
 
-// 🔥 Senior Update: Импортируем из единого axios.js и используем именованный импорт для чистоты
+// 🔥 Senior Update: Импортируем из единого axios.js
 import API, { fetchDashboardStats } from "../api/axios.js";
 
 export default function Dashboard() {
@@ -105,7 +105,7 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error("Критическая ошибка при получении аналитики:", err);
-      // Сбрасываем в 0, если сервер недоступен, чтобы не вводить в заблуждение фейками
+      // 🔥 Senior Practice: Никаких фейковых данных! Если сервер недоступен, ставим 0.
       setStats({
         totalOrders: 0,
         totalRevenue: 0,

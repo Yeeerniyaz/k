@@ -1,86 +1,104 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-  Title, Text, Paper, Button, Group, ActionIcon, 
-  Skeleton, Alert, Select, TextInput, Badge, Center, 
-  Stack, Accordion, Divider, Grid, ThemeIcon, MultiSelect, 
-  Tooltip, NumberInput, Table, Box
-} from '@mantine/core';
-import { 
-  IconPlus, IconTrash, IconAlertCircle, IconRefresh, 
-  IconCalculator, IconMathFunction, IconSettings, 
-  IconDeviceFloppy, IconCode, IconChecklist,
-  IconCopy, IconArrowUp, IconArrowDown // 🔥 Добавлены новые иконки для Enterprise фич
-} from '@tabler/icons-react';
-import api from '../api/index.js';
+  Title,
+  Text,
+  Paper,
+  Button,
+  Group,
+  ActionIcon,
+  Skeleton,
+  Alert,
+  Select,
+  TextInput,
+  Badge,
+  Center,
+  Stack,
+  Accordion,
+  Divider,
+  Grid,
+  ThemeIcon,
+  MultiSelect,
+  Tooltip,
+  NumberInput,
+  Table,
+  Box,
+} from "@mantine/core";
+import {
+  IconPlus,
+  IconTrash,
+  IconAlertCircle,
+  IconRefresh,
+  IconCalculator,
+  IconMathFunction,
+  IconSettings,
+  IconDeviceFloppy,
+  IconCode,
+  IconChecklist,
+  IconCopy,
+  IconArrowUp,
+  IconArrowDown, // 🔥 Добавлены новые иконки для Enterprise фич
+} from "@tabler/icons-react";
+
+// 🔥 Senior Update: Используем единый инстанс API из axios.js
+import api from "../api/axios.js";
 
 export default function CalculatorSettings() {
   // ==========================================
   // СОСТОЯНИЯ ДАННЫХ
   // ==========================================
   const [configs, setConfigs] = useState([]);
-  const [prices, setPrices] = useState([]); 
+  const [prices, setPrices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
 
   // Расширенные математические формулы
   const formulaTypes = [
-    { value: 'area', label: 'Площадь (X × Y × Базовая Цена)' },
-    { value: 'height_count', label: 'Размер × Количество (X × Y × Базовая Цена)' },
-    { value: 'length', label: 'Погонный метр (X × Базовая Цена)' },
-    { value: 'unit', label: 'Поштучно (Количество × Базовая Цена)' },
-    { value: 'custom', label: 'Своя сложная формула (Custom Math)' } 
+    { value: "area", label: "Площадь (X × Y × Базовая Цена)" },
+    {
+      value: "height_count",
+      label: "Размер × Количество (X × Y × Базовая Цена)",
+    },
+    { value: "length", label: "Погонный метр (X × Базовая Цена)" },
+    { value: "unit", label: "Поштучно (Количество × Базовая Цена)" },
+    { value: "custom", label: "Своя сложная формула (Custom Math)" },
   ];
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ДАННЫХ
+  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ДАННЫХ (REAL DATA)
   // ==========================================
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const pricesRes = await api.get('/prices');
-      const loadedPrices = pricesRes.data.data || pricesRes.data || [];
-      setPrices(loadedPrices.map(p => ({ value: p.id || p.service, label: `${p.service} (${p.price} ₸)` })));
 
-      const configRes = await api.get('/settings/calculator');
+      const pricesRes = await api.get("/prices");
+      const loadedPrices = pricesRes.data.data || pricesRes.data || [];
+      setPrices(
+        loadedPrices.map((p) => ({
+          value: p.id || p.service,
+          label: `${p.service} (${p.price} ₸)`,
+        })),
+      );
+
+      const configRes = await api.get("/settings/calculator");
       if (configRes.data && configRes.data.config) {
         // Убеждаемся, что у всех есть массив addons
-        const loadedConfigs = configRes.data.config.map(c => ({ ...c, addons: c.addons || [] }));
+        const loadedConfigs = configRes.data.config.map((c) => ({
+          ...c,
+          addons: c.addons || [],
+        }));
         setConfigs(loadedConfigs);
       } else {
         setConfigs([]);
       }
     } catch (err) {
-      console.error('Ошибка загрузки настроек:', err);
-      // Сеньорский фоллбэк с супер-настройками
-      setConfigs([
-        {
-          id: 'banners',
-          title: 'Баннеры',
-          calcType: 'area',
-          customFormula: '',
-          fields: [{ name: 'val1', label: 'Ширина (м)' }, { name: 'val2', label: 'Высота (м)' }],
-          linkedPrices: [],
-          addons: [
-            { id: 'add-1', name: 'Усиленная проклейка краев', type: 'fixed', value: 1500 },
-            { id: 'add-2', name: 'Срочная печать (24 часа)', type: 'percent', value: 30 }
-          ]
-        },
-        {
-          id: 'complex_lightbox',
-          title: 'Сложный Лайтбокс',
-          calcType: 'custom',
-          customFormula: '(val1 * val2 * basePrice) + ((val1 * 2 + val2 * 2) * 2500)', // Площадь + Периметр (профиль)
-          fields: [{ name: 'val1', label: 'Ширина (м)' }, { name: 'val2', label: 'Высота (м)' }],
-          linkedPrices: [],
-          addons: [
-            { id: 'add-3', name: 'Сложный монтаж (вышка)', type: 'fixed', value: 25000 }
-          ]
-        }
-      ]);
-      setError('Автономный режим. Загружен демонстрационный Advanced конструктор.');
+      console.error("Ошибка загрузки настроек:", err);
+      // 🔥 Senior Practice: Никаких фейковых данных!
+      setConfigs([]);
+      setError(
+        "Не удалось загрузить настройки калькулятора. Проверьте соединение с сервером.",
+      );
     } finally {
       setLoading(false);
     }
@@ -97,157 +115,233 @@ export default function CalculatorSettings() {
     setConfigs([
       ...configs,
       {
-        id: `section_${Date.now()}`,
-        title: 'Новый раздел',
-        calcType: 'area',
-        customFormula: '',
-        fields: [{ name: 'val1', label: 'Поле 1' }],
+        id: `config_${Date.now()}`,
+        title: "Новый раздел",
+        calcType: "area",
+        customFormula: "",
+        fields: [{ name: "val1", label: "Поле 1" }],
         linkedPrices: [],
-        addons: []
-      }
+        addons: [], // 🔥 Добавили поддержку доп. опций
+      },
     ]);
   };
 
-  const handleRemoveConfig = (index) => {
-    if (!window.confirm('Удалить этот раздел калькулятора?')) return;
+  const handleRemoveConfig = (id) => {
+    if (
+      !window.confirm(
+        "Точно удалить этот раздел? Он пропадет из калькулятора на сайте.",
+      )
+    )
+      return;
+    setConfigs(configs.filter((c) => c.id !== id));
+  };
+
+  const updateConfig = (id, key, value) => {
+    setConfigs(configs.map((c) => (c.id === id ? { ...c, [key]: value } : c)));
+  };
+
+  // ==========================================
+  // ФУНКЦИИ КОНСТРУКТОРА: ПОЛЯ (ВВОД КЛИЕНТА)
+  // ==========================================
+  const handleAddField = (configId) => {
+    setConfigs(
+      configs.map((c) => {
+        if (c.id === configId) {
+          const newFieldName = `val${c.fields.length + 1}`;
+          return {
+            ...c,
+            fields: [
+              ...c.fields,
+              {
+                name: newFieldName,
+                label: `Новое поле ${c.fields.length + 1}`,
+              },
+            ],
+          };
+        }
+        return c;
+      }),
+    );
+  };
+
+  const handleRemoveField = (configId, index) => {
+    setConfigs(
+      configs.map((c) => {
+        if (c.id === configId) {
+          const newFields = [...c.fields];
+          newFields.splice(index, 1);
+          return { ...c, fields: newFields };
+        }
+        return c;
+      }),
+    );
+  };
+
+  const updateField = (configId, index, newLabel) => {
+    setConfigs(
+      configs.map((c) => {
+        if (c.id === configId) {
+          const newFields = [...c.fields];
+          newFields[index].label = newLabel;
+          return { ...c, fields: newFields };
+        }
+        return c;
+      }),
+    );
+  };
+
+  // ==========================================
+  // ФУНКЦИИ КОНСТРУКТОРА: ДОП. ОПЦИИ (ADDONS) 🔥 НОВОЕ
+  // ==========================================
+  const handleAddAddon = (configId) => {
+    setConfigs(
+      configs.map((c) => {
+        if (c.id === configId) {
+          const currentAddons = c.addons || [];
+          return {
+            ...c,
+            addons: [
+              ...currentAddons,
+              {
+                id: `add_${Date.now()}`,
+                name: "Новая опция",
+                type: "fixed",
+                value: 0,
+              },
+            ],
+          };
+        }
+        return c;
+      }),
+    );
+  };
+
+  const handleRemoveAddon = (configId, addonId) => {
+    setConfigs(
+      configs.map((c) => {
+        if (c.id === configId) {
+          return { ...c, addons: c.addons.filter((a) => a.id !== addonId) };
+        }
+        return c;
+      }),
+    );
+  };
+
+  const updateAddon = (configId, addonId, key, val) => {
+    setConfigs(
+      configs.map((c) => {
+        if (c.id === configId) {
+          return {
+            ...c,
+            addons: c.addons.map((a) =>
+              a.id === addonId ? { ...a, [key]: val } : a,
+            ),
+          };
+        }
+        return c;
+      }),
+    );
+  };
+
+  // ==========================================
+  // СОРТИРОВКА БЛОКОВ КАЛЬКУЛЯТОРА
+  // ==========================================
+  const moveConfigUp = (index) => {
+    if (index === 0) return;
     const newConfigs = [...configs];
-    newConfigs.splice(index, 1);
+    const temp = newConfigs[index - 1];
+    newConfigs[index - 1] = newConfigs[index];
+    newConfigs[index] = temp;
     setConfigs(newConfigs);
   };
 
-  const handleChangeConfig = (index, key, value) => {
+  const moveConfigDown = (index) => {
+    if (index === configs.length - 1) return;
     const newConfigs = [...configs];
-    newConfigs[index][key] = value;
-
-    if (key === 'calcType') {
-      if (value === 'length' || value === 'unit') {
-        newConfigs[index].fields = [{ name: 'val1', label: 'Значение' }];
-      } else if (value === 'area' || value === 'height_count') {
-        newConfigs[index].fields = [
-          { name: 'val1', label: 'Ширина / Размер' },
-          { name: 'val2', label: 'Высота / Количество' }
-        ];
-      }
-      // При кастомном типе поля не трогаем, даем юзеру самому добавлять
-    }
-    
+    const temp = newConfigs[index + 1];
+    newConfigs[index + 1] = newConfigs[index];
+    newConfigs[index] = temp;
     setConfigs(newConfigs);
   };
 
-  // 🔥 НОВОЕ: Дублирование (Клонирование) существующего блока
-  const handleCloneConfig = (index) => {
-    const configToClone = configs[index];
-    const clonedConfig = {
-      ...JSON.parse(JSON.stringify(configToClone)), // Глубокая копия, чтобы не мутировать вложенные массивы
-      id: `section_${Date.now()}`,
-      title: `${configToClone.title} (Копия)`
+  // ДУБЛИРОВАНИЕ БЛОКА
+  const handleDuplicateConfig = (config) => {
+    const duplicatedConfig = {
+      ...config,
+      id: `config_${Date.now()}`, // Создаем новый уникальный ID
+      title: `${config.title} (Копия)`,
     };
-    const newConfigs = [...configs];
-    newConfigs.splice(index + 1, 0, clonedConfig); // Вставляем сразу после текущего
-    setConfigs(newConfigs);
-  };
-
-  // 🔥 НОВОЕ: Перемещение блока вверх/вниз
-  const handleMoveConfig = (index, direction) => {
-    if (direction === 'up' && index > 0) {
-      const newConfigs = [...configs];
-      [newConfigs[index - 1], newConfigs[index]] = [newConfigs[index], newConfigs[index - 1]];
-      setConfigs(newConfigs);
-    }
-    if (direction === 'down' && index < configs.length - 1) {
-      const newConfigs = [...configs];
-      [newConfigs[index + 1], newConfigs[index]] = [newConfigs[index], newConfigs[index + 1]];
-      setConfigs(newConfigs);
-    }
+    setConfigs([...configs, duplicatedConfig]);
   };
 
   // ==========================================
-  // ФУНКЦИИ КОНСТРУКТОРА: ПОЛЯ ВВОДА (ДЛЯ КАСТОМА)
-  // ==========================================
-  const handleAddField = (cIndex) => {
-    const newConfigs = [...configs];
-    const fieldsCount = newConfigs[cIndex].fields.length;
-    newConfigs[cIndex].fields.push({ name: `val${fieldsCount + 1}`, label: `Новое поле ${fieldsCount + 1}` });
-    setConfigs(newConfigs);
-  };
-
-  const handleRemoveField = (cIndex, fIndex) => {
-    const newConfigs = [...configs];
-    newConfigs[cIndex].fields.splice(fIndex, 1);
-    // Пересчитываем имена переменных
-    newConfigs[cIndex].fields.forEach((f, i) => { f.name = `val${i + 1}` });
-    setConfigs(newConfigs);
-  };
-
-  const handleChangeField = (cIndex, fIndex, newLabel) => {
-    const newConfigs = [...configs];
-    newConfigs[cIndex].fields[fIndex].label = newLabel;
-    setConfigs(newConfigs);
-  };
-
-  // ==========================================
-  // ФУНКЦИИ КОНСТРУКТОРА: НАДБАВКИ (ADDONS)
-  // ==========================================
-  const handleAddAddon = (cIndex) => {
-    const newConfigs = [...configs];
-    if (!newConfigs[cIndex].addons) newConfigs[cIndex].addons = [];
-    newConfigs[cIndex].addons.push({ id: `add_${Date.now()}`, name: 'Новая опция', type: 'fixed', value: 0 });
-    setConfigs(newConfigs);
-  };
-
-  const handleRemoveAddon = (cIndex, aIndex) => {
-    const newConfigs = [...configs];
-    newConfigs[cIndex].addons.splice(aIndex, 1);
-    setConfigs(newConfigs);
-  };
-
-  const handleChangeAddon = (cIndex, aIndex, key, val) => {
-    const newConfigs = [...configs];
-    newConfigs[cIndex].addons[aIndex][key] = val;
-    setConfigs(newConfigs);
-  };
-
-  // ==========================================
-  // СОХРАНЕНИЕ
+  // СОХРАНЕНИЕ НА БЭКЕНД (REAL DATA)
   // ==========================================
   const handleSaveConfigs = async () => {
     setIsSaving(true);
     try {
-      await api.post('/settings/calculator', { config: configs });
-      alert('Сложная архитектура калькулятора успешно сохранена!');
+      await api.post("/settings/calculator", { config: configs });
+      alert("Сложная архитектура калькулятора успешно сохранена!");
     } catch (err) {
-      console.error('Ошибка сохранения:', err);
-      if (error) {
-        alert('Демо-режим: настройки визуально сохранены (бэкенд не подключен).');
-      } else {
-        alert('Не удалось сохранить настройки.');
-      }
+      console.error("Ошибка сохранения:", err);
+      // 🔥 Senior Update: Показываем реальную ошибку
+      alert(
+        err.response?.data?.message ||
+          "Не удалось сохранить настройки. Проверьте соединение с сервером.",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div style={{ fontFamily: '"Google Sans", sans-serif', paddingBottom: '100px' }}>
-      
+    <div
+      style={{
+        fontFamily: '"Google Sans", sans-serif',
+        paddingBottom: "100px",
+      }}
+    >
+      {/* ========================================== */}
+      {/* ШАПКА */}
+      {/* ========================================== */}
       <Group justify="space-between" mb="xl">
         <div>
-          <Title order={2} style={{ color: '#1B2E3D' }}>Enterprise Конструктор</Title>
-          <Text c="dimmed" mt={5}>Сложные формулы, модификаторы цен и динамические инпуты</Text>
+          <Group gap="xs" mb="xs">
+            <IconCalculator size={28} color="#1B2E3D" stroke={1.5} />
+            <Title order={2} style={{ color: "#1B2E3D" }}>
+              Архитектура Калькулятора
+            </Title>
+            <Badge color="orange" variant="light" size="lg">
+              Enterprise Editor
+            </Badge>
+          </Group>
+          <Text c="dimmed">
+            Конструируйте сложную логику расчетов, формулы и дополнительные
+            опции для витрины.
+          </Text>
         </div>
-        
+
         <Group>
-          <Tooltip label="Сбросить изменения">
-            <ActionIcon variant="default" size="lg" onClick={fetchData} loading={loading}>
+          <Tooltip label="Сбросить и обновить из базы">
+            <ActionIcon
+              variant="default"
+              size="lg"
+              onClick={fetchData}
+              loading={loading}
+            >
               <IconRefresh size={18} stroke={1.5} />
             </ActionIcon>
           </Tooltip>
-          
-          <Button 
-            leftSection={<IconDeviceFloppy size={16} />} 
+          <Button
+            leftSection={<IconDeviceFloppy size={16} />}
             onClick={handleSaveConfigs}
             loading={isSaving}
-            style={{ backgroundColor: '#1B2E3D', color: 'white', fontWeight: 600 }}
+            style={{
+              backgroundColor: "#1B2E3D",
+              color: "white",
+              fontWeight: 600,
+            }}
+            size="md"
           >
             Сохранить архитектуру
           </Button>
@@ -255,262 +349,456 @@ export default function CalculatorSettings() {
       </Group>
 
       {error && (
-        <Alert icon={<IconAlertCircle size={16} />} title="Инженерный режим" color="blue" mb="xl" radius="md">
+        <Alert
+          icon={<IconAlertCircle size={16} />}
+          title="Внимание"
+          color="red"
+          mb="xl"
+          radius="md"
+        >
           {error}
         </Alert>
       )}
 
+      {/* ========================================== */}
+      {/* ГЛАВНЫЙ КОНСТРУКТОР */}
+      {/* ========================================== */}
       {loading ? (
-        <Skeleton height={400} radius="md" />
-      ) : (
-        <Paper withBorder radius="md" p="md" bg="white" shadow="sm">
-          <Group justify="space-between" mb="lg">
-            <Group gap="sm">
-              <ThemeIcon size={40} radius="md" color="royalBlue" variant="light">
-                <IconSettings size={24} color="#1B2E3D" />
-              </ThemeIcon>
-              <div>
-                <Title order={4} style={{ color: '#1B2E3D' }}>Блоки калькулятора</Title>
-                <Text size="xs" c="dimmed">Каждый блок — это отдельная логика на сайте.</Text>
-              </div>
-            </Group>
-            <Button variant="light" color="blue" leftSection={<IconPlus size={16} />} onClick={handleAddConfig}>
-              Добавить логический блок
+        <Stack>
+          <Skeleton height={80} radius="md" />
+          <Skeleton height={80} radius="md" />
+          <Skeleton height={80} radius="md" />
+        </Stack>
+      ) : configs.length === 0 ? (
+        <Paper withBorder p={60} radius="md" bg="white">
+          <Center style={{ flexDirection: "column" }}>
+            <IconMathFunction size={60} color="#e0e0e0" stroke={1} />
+            <Text size="lg" fw={500} mt="md" style={{ color: "#1B2E3D" }}>
+              Калькулятор пуст
+            </Text>
+            <Text c="dimmed" mt={5}>
+              Создайте первый раздел, чтобы начать настройку расчетов.
+            </Text>
+            <Button
+              mt="lg"
+              leftSection={<IconPlus size={16} />}
+              onClick={handleAddConfig}
+              style={{ backgroundColor: "#1B2E3D" }}
+            >
+              Создать блок
             </Button>
-          </Group>
-
-          {configs.length === 0 ? (
-            <Center p="xl"><Text c="dimmed">Калькулятор пуст. Добавьте первый блок.</Text></Center>
-          ) : (
-            <Accordion variant="separated" radius="md">
-              {configs.map((config, cIndex) => {
-                // 🔥 НОВОЕ: Проверка валидности блока
-                const isReady = config.linkedPrices && config.linkedPrices.length > 0;
-                
-                return (
-                <Accordion.Item key={config.id} value={config.id} style={{ border: '1px solid #eaeaea' }}>
-                  
-                  {/* ЗАГОЛОВОК АККОРДЕОНА */}
-                  <Accordion.Control>
-                    <Group justify="space-between">
-                      <Group gap="md">
-                        <IconCalculator size={20} color={config.calcType === 'custom' ? 'orange' : '#1B2E3D'} />
-                        <Text fw={600} style={{ color: '#1B2E3D' }}>{config.title || 'Безымянный раздел'}</Text>
-                      </Group>
-                      <Group gap="xs">
-                        {/* Валидатор состояния */}
-                        {!isReady && (
-                          <Badge color="red" variant="dot">Нет базовых цен</Badge>
+          </Center>
+        </Paper>
+      ) : (
+        <>
+          <Accordion
+            variant="separated"
+            radius="md"
+            multiple
+            defaultValue={configs.length > 0 ? [configs[0].id] : []}
+          >
+            {configs.map((config, index) => (
+              <Accordion.Item
+                key={config.id}
+                value={config.id}
+                style={{
+                  border: "1px solid #dee2e6",
+                  backgroundColor: "white",
+                  marginBottom: "15px",
+                }}
+              >
+                {/* ЗАГОЛОВОК АККОРДЕОНА */}
+                <Accordion.Control>
+                  <Group
+                    justify="space-between"
+                    wrap="nowrap"
+                    style={{ width: "100%", paddingRight: "20px" }}
+                  >
+                    <Group>
+                      <ThemeIcon
+                        color={config.calcType === "custom" ? "orange" : "blue"}
+                        variant="light"
+                        size="lg"
+                        radius="md"
+                      >
+                        {config.calcType === "custom" ? (
+                          <IconCode size={20} />
+                        ) : (
+                          <IconCalculator size={20} />
                         )}
-                        <Badge color={config.calcType === 'custom' ? 'orange' : 'gray'} variant="light">
-                          {formulaTypes.find(f => f.value === config.calcType)?.label || 'Формула'}
-                        </Badge>
-                      </Group>
+                      </ThemeIcon>
+                      <div>
+                        <Text fw={700} size="lg" style={{ color: "#1B2E3D" }}>
+                          {config.title || "Безымянный раздел"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          ID: {config.id} | Логика: {config.calcType}
+                        </Text>
+                      </div>
                     </Group>
-                  </Accordion.Control>
-                  
-                  {/* ТЕЛО НАСТРОЕК */}
-                  <Accordion.Panel>
-                    <Stack gap="xl" mt="md">
-                      
-                      {/* 1. БАЗОВАЯ ЛОГИКА */}
-                      <Paper p="md" bg="#f8f9fa" radius="md" withBorder>
-                        <Title order={6} mb="md" style={{ color: '#1B2E3D' }}>Основная логика</Title>
-                        <Grid>
-                          <Grid.Col span={{ base: 12, md: 6 }}>
-                            <TextInput
-                              label="Название раздела (видит клиент)"
-                              placeholder="Например: Баннеры"
-                              value={config.title}
-                              onChange={(e) => handleChangeConfig(cIndex, 'title', e.currentTarget.value)}
-                              fw={600}
-                            />
-                          </Grid.Col>
-                          <Grid.Col span={{ base: 12, md: 6 }}>
-                            <Select
-                              label="Движок расчета"
-                              data={formulaTypes}
-                              value={config.calcType}
-                              onChange={(val) => handleChangeConfig(cIndex, 'calcType', val)}
-                              leftSection={<IconMathFunction size={16} />}
-                              fw={600}
-                            />
-                          </Grid.Col>
-                        </Grid>
 
-                        {/* КАСТОМНАЯ ФОРМУЛА (Только если выбран тип custom) */}
-                        {config.calcType === 'custom' && (
-                          <Box mt="md" p="md" style={{ backgroundColor: '#fff', border: '1px dashed orange', borderRadius: '8px' }}>
-                            <Group gap="xs" mb="xs">
-                              <IconCode size={18} color="orange" />
-                              <Text fw={600} size="sm" color="orange">Синтаксис кастомной формулы</Text>
-                            </Group>
-                            <Text size="xs" c="dimmed" mb="md">
-                              Используйте математические операторы <b>+, -, *, /, ()</b>. Переменные: <b>basePrice</b> (выбранная цена материала), <b>val1, val2...</b> (поля ввода пользователя).
-                            </Text>
-                            <TextInput
-                              placeholder="Например: (val1 * val2 * basePrice) + 5000"
-                              value={config.customFormula}
-                              onChange={(e) => handleChangeConfig(cIndex, 'customFormula', e.currentTarget.value)}
-                              styles={{ input: { fontFamily: 'monospace', color: '#1B2E3D' } }}
-                            />
-                          </Box>
-                        )}
+                    {/* УПРАВЛЕНИЕ БЛОКОМ (СТРЕЛКИ И УДАЛЕНИЕ) */}
+                    <Group gap="xs" onClick={(e) => e.stopPropagation()}>
+                      <Tooltip label="Вверх">
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          onClick={() => moveConfigUp(index)}
+                          disabled={index === 0}
+                        >
+                          <IconArrowUp size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Вниз">
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          onClick={() => moveConfigDown(index)}
+                          disabled={index === configs.length - 1}
+                        >
+                          <IconArrowDown size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Дублировать блок">
+                        <ActionIcon
+                          variant="subtle"
+                          color="blue"
+                          onClick={() => handleDuplicateConfig(config)}
+                        >
+                          <IconCopy size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Удалить раздел">
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          onClick={() => handleRemoveConfig(config.id)}
+                        >
+                          <IconTrash size={16} stroke={1.5} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                </Accordion.Control>
+
+                {/* СОДЕРЖИМОЕ АККОРДЕОНА (НАСТРОЙКИ) */}
+                <Accordion.Panel>
+                  <Stack gap="xl" p="md">
+                    {/* ОСНОВНЫЕ НАСТРОЙКИ */}
+                    <Paper p="md" withBorder radius="md" bg="#f8f9fa">
+                      <Title order={5} mb="md" style={{ color: "#1B2E3D" }}>
+                        <IconSettings
+                          size={16}
+                          style={{ verticalAlign: "middle", marginRight: 5 }}
+                        />
+                        Базовые настройки
+                      </Title>
+                      <Grid>
+                        <Grid.Col span={{ base: 12, md: 4 }}>
+                          <TextInput
+                            label="Название раздела (Для клиента)"
+                            value={config.title}
+                            onChange={(e) =>
+                              updateConfig(
+                                config.id,
+                                "title",
+                                e.currentTarget.value,
+                              )
+                            }
+                            styles={{ label: { fontWeight: 600 } }}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={{ base: 12, md: 4 }}>
+                          <Select
+                            label="Алгоритм расчета"
+                            data={formulaTypes}
+                            value={config.calcType}
+                            onChange={(val) =>
+                              updateConfig(config.id, "calcType", val)
+                            }
+                            styles={{ label: { fontWeight: 600 } }}
+                          />
+                        </Grid.Col>
+                        <Grid.Col span={{ base: 12, md: 4 }}>
+                          <MultiSelect
+                            label="Доступные материалы (Прайс)"
+                            placeholder="Выберите связанные услуги"
+                            data={prices}
+                            searchable
+                            clearable
+                            value={config.linkedPrices || []}
+                            onChange={(val) =>
+                              updateConfig(config.id, "linkedPrices", val)
+                            }
+                            styles={{ label: { fontWeight: 600 } }}
+                          />
+                        </Grid.Col>
+                      </Grid>
+                    </Paper>
+
+                    {/* КАСТОМНАЯ ФОРМУЛА (ЕСЛИ ВЫБРАНА) */}
+                    {config.calcType === "custom" && (
+                      <Paper
+                        p="md"
+                        withBorder
+                        radius="md"
+                        style={{
+                          borderLeft: "4px solid #f08c00",
+                          backgroundColor: "#fffcf5",
+                        }}
+                      >
+                        <Title order={5} mb="xs" style={{ color: "#d9480f" }}>
+                          <IconCode
+                            size={16}
+                            style={{ verticalAlign: "middle", marginRight: 5 }}
+                          />
+                          Кастомная математика (JS Eval)
+                        </Title>
+                        <Text size="sm" c="dimmed" mb="md">
+                          Используйте переменные <b>val1, val2...</b> (поля
+                          ввода) и <b>basePrice</b> (выбранный прайс).
+                          Поддерживаются скобки (), +, -, *, /.
+                        </Text>
+                        <TextInput
+                          placeholder="Например: (val1 * val2 * basePrice) + ((val1 * 2 + val2 * 2) * 1500)"
+                          value={config.customFormula}
+                          onChange={(e) =>
+                            updateConfig(
+                              config.id,
+                              "customFormula",
+                              e.currentTarget.value,
+                            )
+                          }
+                          styles={{
+                            input: {
+                              fontFamily: "monospace",
+                              fontSize: "14px",
+                              backgroundColor: "#343a40",
+                              color: "#69db7c",
+                            },
+                          }}
+                        />
                       </Paper>
+                    )}
 
-                      {/* 2. ПОЛЯ ВВОДА (INPUTS) */}
-                      <Paper p="md" bg="#f8f9fa" radius="md" withBorder>
-                        <Group justify="space-between" mb="md">
-                          <div>
-                            <Title order={6} style={{ color: '#1B2E3D' }}>Поля ввода для клиента</Title>
-                            <Text size="xs" c="dimmed">Какие размеры или параметры должен ввести клиент?</Text>
-                          </div>
-                          {config.calcType === 'custom' && (
-                            <Button size="xs" variant="light" onClick={() => handleAddField(cIndex)}>
-                              + Добавить переменную
-                            </Button>
-                          )}
-                        </Group>
-                        
+                    {/* ПОЛЯ ВВОДА */}
+                    <Paper p="md" withBorder radius="md">
+                      <Group justify="space-between" mb="md">
+                        <Title order={5} style={{ color: "#1B2E3D" }}>
+                          Поля для ввода (X, Y, Кол-во)
+                        </Title>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<IconPlus size={14} />}
+                          onClick={() => handleAddField(config.id)}
+                        >
+                          Добавить переменную
+                        </Button>
+                      </Group>
+
+                      {config.fields.length === 0 ? (
+                        <Text size="sm" c="dimmed">
+                          Нет полей. Калькулятор будет использовать только
+                          базовую цену.
+                        </Text>
+                      ) : (
                         <Grid>
                           {config.fields.map((field, fIndex) => (
-                            <Grid.Col span={{ base: 12, md: 6 }} key={fIndex}>
-                              <TextInput
-                                label={config.calcType === 'custom' ? `Переменная: ${field.name}` : `Метка поля`}
-                                value={field.label}
-                                onChange={(e) => handleChangeField(cIndex, fIndex, e.currentTarget.value)}
-                                description={`Внутреннее имя: ${field.name}`}
-                                rightSection={
-                                  config.calcType === 'custom' && config.fields.length > 1 ? (
-                                    <ActionIcon color="red" variant="subtle" onClick={() => handleRemoveField(cIndex, fIndex)}>
-                                      <IconTrash size={16} />
-                                    </ActionIcon>
-                                  ) : null
-                                }
-                              />
+                            <Grid.Col
+                              span={{ base: 12, sm: 6, md: 4 }}
+                              key={fIndex}
+                            >
+                              <Group align="flex-end">
+                                <TextInput
+                                  label={`Переменная ${field.name}`}
+                                  value={field.label}
+                                  onChange={(e) =>
+                                    updateField(
+                                      config.id,
+                                      fIndex,
+                                      e.currentTarget.value,
+                                    )
+                                  }
+                                  style={{ flexGrow: 1 }}
+                                />
+                                <ActionIcon
+                                  color="red"
+                                  variant="subtle"
+                                  onClick={() =>
+                                    handleRemoveField(config.id, fIndex)
+                                  }
+                                  mb={5}
+                                >
+                                  <IconTrash size={18} />
+                                </ActionIcon>
+                              </Group>
                             </Grid.Col>
                           ))}
                         </Grid>
-                      </Paper>
+                      )}
+                    </Paper>
 
-                      {/* 3. ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ (ADD-ONS) */}
-                      <Paper p="md" bg="#f8f9fa" radius="md" withBorder style={{ borderLeft: '4px solid #339af0' }}>
-                        <Group justify="space-between" mb="md">
-                          <Group gap="xs">
-                            <IconChecklist size={20} color="#339af0" />
-                            <div>
-                              <Title order={6} style={{ color: '#1B2E3D' }}>Надбавки и Опции (Add-ons)</Title>
-                              <Text size="xs" c="dimmed">Чекбоксы для доп. услуг (Срочность, Монтаж, Усиление)</Text>
-                            </div>
-                          </Group>
-                          <Button size="xs" color="blue" variant="light" leftSection={<IconPlus size={14}/>} onClick={() => handleAddAddon(cIndex)}>
-                            Добавить опцию
-                          </Button>
-                        </Group>
-
-                        {config.addons && config.addons.length > 0 ? (
-                          <Table verticalSpacing="sm">
-                            <Table.Thead>
-                              <Table.Tr>
-                                <Table.Th>Название опции</Table.Th>
-                                <Table.Th>Тип надбавки</Table.Th>
-                                <Table.Th>Значение</Table.Th>
-                                <Table.Th></Table.Th>
-                              </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                              {config.addons.map((addon, aIndex) => (
-                                <Table.Tr key={addon.id}>
-                                  <Table.Td>
-                                    <TextInput 
-                                      placeholder="Например: Монтаж" 
-                                      value={addon.name} 
-                                      onChange={(e) => handleChangeAddon(cIndex, aIndex, 'name', e.currentTarget.value)}
-                                    />
-                                  </Table.Td>
-                                  <Table.Td>
-                                    <Select 
-                                      data={[
-                                        { value: 'fixed', label: 'Фикс. сумма (₸)' },
-                                        { value: 'percent', label: 'Процент от итога (%)' }
-                                      ]}
-                                      value={addon.type}
-                                      onChange={(val) => handleChangeAddon(cIndex, aIndex, 'type', val)}
-                                    />
-                                  </Table.Td>
-                                  <Table.Td>
-                                    <NumberInput 
-                                      min={0} 
-                                      value={addon.value}
-                                      onChange={(val) => handleChangeAddon(cIndex, aIndex, 'value', val)}
-                                    />
-                                  </Table.Td>
-                                  <Table.Td ta="right">
-                                    <ActionIcon color="red" variant="subtle" onClick={() => handleRemoveAddon(cIndex, aIndex)}>
-                                      <IconTrash size={16} />
-                                    </ActionIcon>
-                                  </Table.Td>
-                                </Table.Tr>
-                              ))}
-                            </Table.Tbody>
-                          </Table>
-                        ) : (
-                          <Text size="sm" c="dimmed" ta="center" py="sm">Нет дополнительных опций</Text>
-                        )}
-                      </Paper>
-
-                      {/* 4. ПРИВЯЗКА БАЗОВЫХ ЦЕН */}
-                      <Paper p="md" bg="#f8f9fa" radius="md" withBorder>
-                        <Title order={6} mb="md" style={{ color: '#1B2E3D' }}>Привязка базовых цен (Прайс-лист)</Title>
-                        <MultiSelect
-                          label="Доступные материалы для этого раздела (Это будет переменная basePrice)"
-                          placeholder="Выберите цены из базы данных"
-                          data={prices}
-                          searchable
-                          value={config.linkedPrices || []}
-                          onChange={(val) => handleChangeConfig(cIndex, 'linkedPrices', val)}
-                        />
-                        {!isReady && (
-                          <Text color="red" size="sm" mt="xs">⚠️ Обязательно выберите хотя бы один материал, иначе блок не будет работать в калькуляторе!</Text>
-                        )}
-                      </Paper>
-
-                      {/* 5. ПАНЕЛЬ ДЕЙСТВИЙ БЛОКА (НОВЫЙ ENTERPRISE БЛОК) */}
-                      <Divider />
-                      <Group justify="space-between">
-                        {/* Стрелки вверх-вниз для сортировки */}
-                        <Group gap="xs">
-                          <Tooltip label="Переместить выше">
-                            <ActionIcon variant="light" color="gray" onClick={() => handleMoveConfig(cIndex, 'up')} disabled={cIndex === 0}>
-                              <IconArrowUp size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                          <Tooltip label="Переместить ниже">
-                            <ActionIcon variant="light" color="gray" onClick={() => handleMoveConfig(cIndex, 'down')} disabled={cIndex === configs.length - 1}>
-                              <IconArrowDown size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                        </Group>
-                        
-                        {/* Копирование и Удаление */}
-                        <Group gap="sm">
-                          <Button variant="light" color="blue" leftSection={<IconCopy size={16} />} onClick={() => handleCloneConfig(cIndex)}>
-                            Дублировать блок
-                          </Button>
-                          <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => handleRemoveConfig(cIndex)}>
-                            Удалить раздел
-                          </Button>
-                        </Group>
+                    {/* ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ (ЧЕКБОКСЫ) - 🔥 НОВЫЙ БЛОК */}
+                    <Paper
+                      p="md"
+                      withBorder
+                      radius="md"
+                      style={{ borderLeft: "4px solid #1B2E3D" }}
+                    >
+                      <Group justify="space-between" mb="md">
+                        <div>
+                          <Title order={5} style={{ color: "#1B2E3D" }}>
+                            Дополнительные опции (Add-ons)
+                          </Title>
+                          <Text size="xs" c="dimmed">
+                            Чекбоксы, которые увеличивают итоговую стоимость
+                            (например: "Монтаж", "Срочность")
+                          </Text>
+                        </div>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          color="indigo"
+                          leftSection={<IconChecklist size={14} />}
+                          onClick={() => handleAddAddon(config.id)}
+                        >
+                          Добавить опцию
+                        </Button>
                       </Group>
 
-                    </Stack>
-                  </Accordion.Panel>
-                </Accordion.Item>
-              )})}
-            </Accordion>
-          )}
-        </Paper>
+                      {!config.addons || config.addons.length === 0 ? (
+                        <Text size="sm" c="dimmed">
+                          Дополнительные опции не настроены.
+                        </Text>
+                      ) : (
+                        <Table striped highlightOnHover>
+                          <Table.Thead>
+                            <Table.Tr>
+                              <Table.Th>Название опции</Table.Th>
+                              <Table.Th>Тип наценки</Table.Th>
+                              <Table.Th>Значение (₸ / %)</Table.Th>
+                              <Table.Th w={50}></Table.Th>
+                            </Table.Tr>
+                          </Table.Thead>
+                          <Table.Tbody>
+                            {config.addons.map((addon) => (
+                              <Table.Tr key={addon.id}>
+                                <Table.Td>
+                                  <TextInput
+                                    placeholder="Название (напр. Срочность)"
+                                    value={addon.name}
+                                    onChange={(e) =>
+                                      updateAddon(
+                                        config.id,
+                                        addon.id,
+                                        "name",
+                                        e.currentTarget.value,
+                                      )
+                                    }
+                                  />
+                                </Table.Td>
+                                <Table.Td>
+                                  <Select
+                                    data={[
+                                      {
+                                        value: "fixed",
+                                        label: "Фиксированная сумма (₸)",
+                                      },
+                                      {
+                                        value: "percent",
+                                        label: "Процент от итога (%)",
+                                      },
+                                    ]}
+                                    value={addon.type}
+                                    onChange={(val) =>
+                                      updateAddon(
+                                        config.id,
+                                        addon.id,
+                                        "type",
+                                        val,
+                                      )
+                                    }
+                                  />
+                                </Table.Td>
+                                <Table.Td>
+                                  <NumberInput
+                                    value={addon.value}
+                                    onChange={(val) =>
+                                      updateAddon(
+                                        config.id,
+                                        addon.id,
+                                        "value",
+                                        val,
+                                      )
+                                    }
+                                    min={0}
+                                  />
+                                </Table.Td>
+                                <Table.Td>
+                                  <ActionIcon
+                                    color="red"
+                                    variant="subtle"
+                                    onClick={() =>
+                                      handleRemoveAddon(config.id, addon.id)
+                                    }
+                                  >
+                                    <IconTrash size={16} />
+                                  </ActionIcon>
+                                </Table.Td>
+                              </Table.Tr>
+                            ))}
+                          </Table.Tbody>
+                        </Table>
+                      )}
+                    </Paper>
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
+            ))}
+          </Accordion>
+
+          <Center mt="xl">
+            <Button
+              variant="outline"
+              color="gray"
+              leftSection={<IconPlus size={16} />}
+              onClick={handleAddConfig}
+              size="md"
+            >
+              Добавить еще один раздел
+            </Button>
+          </Center>
+        </>
       )}
+
+      {/* ПЛАВАЮЩАЯ ПАНЕЛЬ СОХРАНЕНИЯ (Для удобства при долгом скролле) */}
+      <Box
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(10px)",
+          borderTop: "1px solid #eaeaea",
+          padding: "15px 20px",
+          display: "flex",
+          justifyContent: "flex-end",
+          zIndex: 100,
+          boxShadow: "0 -4px 12px rgba(0,0,0,0.05)",
+        }}
+      >
+        <Button
+          leftSection={<IconDeviceFloppy size={18} />}
+          onClick={handleSaveConfigs}
+          loading={isSaving}
+          style={{ backgroundColor: "#1B2E3D", color: "white" }}
+          size="lg"
+        >
+          Сохранить изменения
+        </Button>
+      </Box>
     </div>
   );
 }

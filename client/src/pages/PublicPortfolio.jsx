@@ -19,7 +19,9 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { IconPhotoOff, IconX, IconArrowLeft } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import api from "../api/index.js";
+
+// 🔥 Senior Update: Импортируем готовый метод из axios.js
+import { fetchPortfolio as apiFetchPortfolio } from "../api/axios.js";
 
 export default function PublicPortfolio() {
   const navigate = useNavigate();
@@ -50,49 +52,20 @@ export default function PublicPortfolio() {
   ];
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ДАННЫХ
+  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА РАБОТ (REAL DATA)
   // ==========================================
   const fetchPortfolio = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/portfolio");
-      // В публичной части показываем только то, что есть.
-      // Если бэкенд поддерживает isVisible, можно было бы фильтровать: .filter(i => i.isVisible)
-      setItems(response.data.data || []);
+      setError(null);
+      // 🔥 Используем метод из нового axios.js
+      const response = await apiFetchPortfolio();
+      setItems(response.data.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки портфолио:", err);
-      // Фолбэк для режима разработки
-      setItems([
-        {
-          id: "1",
-          title: "Вывеска для ресторана",
-          category: "signboards",
-          description: "Световые буквы на композите. Яркое свечение ночью.",
-          imageUrl: "https://placehold.co/800x600?text=Ресторан",
-        },
-        {
-          id: "2",
-          title: "Огромный баннер",
-          category: "banners",
-          description: "Широкоформатная печать, монтаж альпинистами.",
-          imageUrl: "https://placehold.co/800x600?text=Баннер",
-        },
-        {
-          id: "3",
-          title: "Двусторонний лайтбокс",
-          category: "lightboxes",
-          description: "Идеально для привлечения пешеходного трафика.",
-          imageUrl: "https://placehold.co/800x600?text=Лайтбокс",
-        },
-        {
-          id: "4",
-          title: "Оформление витрины",
-          category: "pos-materials",
-          description: "Оклейка пленкой Oracal с плоттерной резкой.",
-          imageUrl: "https://placehold.co/800x600?text=Витрина",
-        },
-      ]);
-      setError("Демо-режим: Не удалось подключиться к серверу.");
+      // 🔥 Senior Practice: Никаких фейковых данных! Если сервер не отвечает — пустой массив.
+      setItems([]);
+      setError("Не удалось подключиться к серверу. Попробуйте зайти позже.");
     } finally {
       setLoading(false);
     }
@@ -110,85 +83,77 @@ export default function PublicPortfolio() {
     open();
   };
 
-  const filteredItems =
-    activeCategory === "ALL"
-      ? items
-      : items.filter((item) => item.category === activeCategory);
-
   const getCategoryLabel = (val) => {
     const cat = categories.find((c) => c.value === val);
     return cat ? cat.label : val;
   };
 
+  // Фильтруем и сортируем (свежие сверху)
+  const filteredItems = items
+    .filter((item) =>
+      activeCategory === "ALL" ? true : item.category === activeCategory,
+    )
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
   return (
-    <Box
-      bg="#f8f9fa"
-      style={{ minHeight: "100vh", fontFamily: '"Google Sans", sans-serif' }}
-    >
+    <Box bg="#f8f9fa" style={{ minHeight: "100vh", paddingBottom: "80px" }}>
       {/* ========================================== */}
-      {/* НАВИГАЦИЯ / ШАПКА */}
+      {/* ШАПКА ПОРТФОЛИО */}
       {/* ========================================== */}
       <Box
-        bg="#1B2E3D"
-        py="md"
-        px="xl"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-        }}
+        bg="white"
+        pt={60}
+        pb={40}
+        style={{ borderBottom: "1px solid #eaeaea" }}
       >
-        <Container size="xl">
-          <Group justify="space-between">
-            <Group
-              gap="sm"
-              style={{ cursor: "pointer" }}
+        <Container size="lg">
+          {/* Кнопка "Назад" */}
+          <Group mb="xl">
+            <Button
+              variant="subtle"
+              color="gray"
+              leftSection={<IconArrowLeft size={16} />}
               onClick={() => navigate("/")}
+              style={{ padding: 0 }}
             >
-              <ActionIcon variant="transparent" color="white" size="lg">
-                <IconArrowLeft size={24} />
-              </ActionIcon>
-              <Title
-                order={3}
-                style={{
-                  fontFamily: '"Alyamama", sans-serif',
-                  color: "white",
-                  letterSpacing: "1px",
-                }}
-              >
-                ROYAL BANNERS
-              </Title>
-            </Group>
-            <Button variant="light" color="gray" onClick={() => navigate("/")}>
               На главную
             </Button>
           </Group>
+
+          <Center style={{ flexDirection: "column" }}>
+            <Title
+              order={1}
+              ta="center"
+              style={{
+                color: "#1B2E3D",
+                fontSize: "clamp(32px, 5vw, 48px)",
+                fontFamily: '"Alyamama", sans-serif',
+                letterSpacing: "1px",
+              }}
+            >
+              ГАЛЕРЕЯ НАШИХ РАБОТ
+            </Title>
+            <Text c="dimmed" size="lg" ta="center" mt="md" maw={600}>
+              Здесь собраны реальные проекты, выполненные нашей командой. От
+              идеи до финального монтажа.
+            </Text>
+          </Center>
         </Container>
       </Box>
 
       {/* ========================================== */}
-      {/* HERO СЕКЦИЯ */}
+      {/* ФИЛЬТРЫ КАТЕГОРИЙ */}
       {/* ========================================== */}
-      <Container size="xl" py={50}>
-        <Center
-          style={{ flexDirection: "column", textAlign: "center" }}
-          mb={40}
-        >
-          <Title
-            order={1}
-            style={{ color: "#1B2E3D", fontSize: "2.5rem", fontWeight: 800 }}
-          >
-            Наши работы
-          </Title>
-          <Text c="dimmed" mt="md" size="lg" maw={600}>
-            Ознакомьтесь с качеством нашего исполнения. Мы гордимся каждым
-            проектом и всегда доводим дело до идеала.
-          </Text>
-        </Center>
+      <Container size="lg" mt={40}>
+        {error && (
+          <Center mb="xl">
+            <Text color="red" fw={500}>
+              {error}
+            </Text>
+          </Center>
+        )}
 
-        {/* ПАНЕЛЬ ФИЛЬТРОВ (КНОПКИ) */}
-        <Group justify="center" gap="xs" mb={40}>
+        <Group justify="center" gap="sm" mb={40}>
           {categories.map((cat) => (
             <Button
               key={cat.value}
@@ -199,6 +164,8 @@ export default function PublicPortfolio() {
                 backgroundColor:
                   activeCategory === cat.value ? "#1B2E3D" : "white",
                 color: activeCategory === cat.value ? "white" : "#1B2E3D",
+                borderColor:
+                  activeCategory === cat.value ? "transparent" : "#eaeaea",
                 transition: "all 0.2s ease",
               }}
             >
@@ -208,13 +175,13 @@ export default function PublicPortfolio() {
         </Group>
 
         {/* ========================================== */}
-        {/* СЕТКА ПОРТФОЛИО */}
+        {/* СЕТКА ПРОЕКТОВ */}
         {/* ========================================== */}
         {loading ? (
           <Grid gutter="xl">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <Grid.Col span={{ base: 12, sm: 6, md: 4 }} key={i}>
-                <Skeleton height={300} radius="md" />
+                <Skeleton height={350} radius="md" />
               </Grid.Col>
             ))}
           </Grid>
@@ -224,12 +191,12 @@ export default function PublicPortfolio() {
               <Grid.Col span={{ base: 12, sm: 6, md: 4 }} key={item.id}>
                 <Card
                   shadow="sm"
-                  padding="none"
+                  padding="lg"
                   radius="md"
                   withBorder
                   style={{
                     cursor: "pointer",
-                    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    transition: "transform 0.3s ease, box-shadow 0.3s ease",
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
@@ -237,12 +204,12 @@ export default function PublicPortfolio() {
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = "translateY(-5px)";
                     e.currentTarget.style.boxShadow =
-                      "0 10px 20px rgba(0,0,0,0.1)";
+                      "0 12px 24px rgba(27, 46, 61, 0.15)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow =
-                      "0 1px 3px rgba(0,0,0,0.05)";
+                      "var(--mantine-shadow-sm)";
                   }}
                   onClick={() => handleImageClick(item)}
                 >
@@ -251,43 +218,38 @@ export default function PublicPortfolio() {
                   >
                     <Image
                       src={item.imageUrl}
-                      height={250}
+                      height={280}
                       alt={item.title}
-                      fallbackSrc="https://placehold.co/600x400?text=Нет+Изображения"
-                      style={{ transition: "transform 0.3s ease" }}
+                      fallbackSrc="https://placehold.co/600x400?text=Изображение+не+найдено"
+                      style={{ transition: "transform 0.5s ease" }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform = "scale(1.05)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
                     />
                     <Badge
                       variant="filled"
+                      size="md"
                       style={{
                         position: "absolute",
-                        top: 12,
-                        right: 12,
-                        backgroundColor: "#1B2E3D",
+                        top: 15,
+                        right: 15,
+                        backgroundColor: "rgba(27, 46, 61, 0.85)",
+                        backdropFilter: "blur(4px)",
                       }}
                     >
                       {getCategoryLabel(item.category)}
                     </Badge>
                   </Card.Section>
 
-                  <Box
-                    p="md"
-                    style={{
-                      flexGrow: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <Text
-                      fw={700}
-                      size="lg"
-                      style={{ color: "#1B2E3D" }}
-                      mb="xs"
-                    >
+                  <Box mt="md" style={{ flexGrow: 1 }}>
+                    <Title order={4} style={{ color: "#1B2E3D" }} lineClamp={1}>
                       {item.title}
-                    </Text>
-                    <Text size="sm" c="dimmed" lineClamp={3}>
-                      {item.description ||
-                        "Ознакомьтесь с деталями этой работы, нажав на фотографию."}
+                    </Title>
+                    <Text size="sm" c="dimmed" mt="xs" lineClamp={2}>
+                      {item.description || "Описание проекта..."}
                     </Text>
                   </Box>
                 </Card>
@@ -295,71 +257,93 @@ export default function PublicPortfolio() {
             ))}
           </Grid>
         ) : (
-          <Center py={80} style={{ flexDirection: "column" }}>
-            <IconPhotoOff size={64} color="#ced4da" stroke={1.5} />
+          <Center
+            style={{
+              flexDirection: "column",
+              padding: "80px 20px",
+              textAlign: "center",
+            }}
+          >
+            <IconPhotoOff size={80} color="#dee2e6" stroke={1.5} />
             <Title order={3} mt="md" style={{ color: "#1B2E3D" }}>
-              Работ не найдено
+              В этом разделе пока пусто
             </Title>
-            <Text c="dimmed" mt="sm">
-              В данной категории пока нет добавленных фотографий.
+            <Text c="dimmed" mt="xs" maw={400}>
+              Возможно, мы еще не успели загрузить фотографии новых объектов.
+              Попробуйте выбрать другую категорию.
             </Text>
             <Button
-              mt="lg"
-              variant="outline"
-              color="gray"
+              mt="xl"
+              variant="default"
               onClick={() => setActiveCategory("ALL")}
             >
-              Смотреть все работы
+              Показать все работы
             </Button>
           </Center>
         )}
       </Container>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА ФОТО (LIGHTBOX) */}
+      {/* МОДАЛЬНОЕ ОКНО LIGHTBOX (СУПЕР-ПРОСМОТР) */}
       {/* ========================================== */}
       <Modal
         opened={opened}
         onClose={close}
-        withCloseButton={false}
-        size="80%" // Огромный размер для детального просмотра
-        padding={0}
-        radius="md"
+        size="auto"
         centered
+        withCloseButton={false}
         overlayProps={{ backgroundOpacity: 0.8, blur: 5 }}
+        styles={{
+          content: { backgroundColor: "transparent", boxShadow: "none" },
+          body: { padding: 0 },
+        }}
       >
         {selectedImage && (
           <Box
-            style={{
-              position: "relative",
-              display: "flex",
-              flexDirection: "column",
-            }}
+            style={{ position: "relative", maxWidth: "90vw", width: "1000px" }}
           >
-            {/* Кнопка закрытия поверх картинки */}
+            {/* Кнопка закрытия */}
             <ActionIcon
               variant="filled"
               color="dark"
+              size="xl"
               radius="xl"
-              size="lg"
+              style={{
+                position: "absolute",
+                top: -20,
+                right: -20,
+                zIndex: 10,
+                border: "2px solid white",
+              }}
               onClick={close}
-              style={{ position: "absolute", top: 15, right: 15, zIndex: 10 }}
             >
               <IconX size={20} />
             </ActionIcon>
 
-            {/* Сама картинка */}
+            {/* Само изображение */}
             <Image
               src={selectedImage.imageUrl}
               alt={selectedImage.title}
-              fit="contain"
-              style={{ maxHeight: "70vh", backgroundColor: "#f1f3f5" }}
-              fallbackSrc="https://placehold.co/1200x800?text=Нет+Изображения"
+              fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
+              style={{
+                maxHeight: "80vh",
+                objectFit: "contain",
+                borderRadius: "12px",
+                backgroundColor: "#fff",
+              }}
             />
 
-            {/* Блок с описанием внизу */}
-            <Box p="xl" bg="white">
-              <Group justify="space-between" align="flex-start" mb="sm">
+            {/* Блок с описанием под фото */}
+            <Box
+              bg="white"
+              p="xl"
+              mt="md"
+              style={{
+                borderRadius: "12px",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+              }}
+            >
+              <Group justify="space-between" align="flex-start" mb="xs">
                 <Title order={3} style={{ color: "#1B2E3D" }}>
                   {selectedImage.title}
                 </Title>

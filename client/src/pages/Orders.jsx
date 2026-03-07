@@ -27,16 +27,19 @@ import {
   IconTrash,
   IconAlertCircle,
   IconRefresh,
-  IconUser,
-  IconPhone,
-  IconFileText,
   IconReceipt,
   IconCalculator,
   IconSearch,
   IconFilter,
   IconArrowsSort,
 } from "@tabler/icons-react";
-import api from "../api/index.js";
+
+// 🔥 Senior Update: Импортируем методы из нашего нового единого axios.js
+import {
+  fetchOrders as apiFetchOrders,
+  updateOrder as apiUpdateOrder,
+  deleteOrder as apiDeleteOrder,
+} from "../api/axios.js";
 
 export default function Orders() {
   // ==========================================
@@ -47,7 +50,7 @@ export default function Orders() {
   const [error, setError] = useState(null);
 
   // ==========================================
-  // СОСТОЯНИЯ ФИЛЬТРОВ И СОРТИРОВКИ (НОВОЕ)
+  // СОСТОЯНИЯ ФИЛЬТРОВ И СОРТИРОВКИ
   // ==========================================
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -72,47 +75,22 @@ export default function Orders() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ЗАКАЗОВ
+  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ЗАКАЗОВ (REAL DATA)
   // ==========================================
   const fetchOrders = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get("/orders");
+      // 🔥 Используем метод из axios.js
+      const response = await apiFetchOrders();
       setOrders(response.data.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки заказов:", err);
-      // Сеньорский фоллбэк: демо-данные с расходами
-      setOrders([
-        {
-          id: "dev-1",
-          clientName: "Тест Калькулятор",
-          clientPhone: "+7 777 111 22 33",
-          description: "Лайтбокс 2х1м (Заявка с калькулятора)",
-          status: "NEW",
-          price: 45000,
-          expenses: [
-            {
-              id: 1,
-              category: "Материалы",
-              amount: 15000,
-              comment: "Акрил и диоды",
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: "dev-2",
-          clientName: "Иван Иванов",
-          clientPhone: "+7 701 000 00 00",
-          description: "Объемные буквы (Свяжитесь с нами)",
-          status: "PENDING",
-          price: 120000,
-          expenses: [],
-          createdAt: new Date(Date.now() - 86400000).toISOString(), // Вчера
-        },
-      ]);
-      setError("Не удалось загрузить боевые заказы. Показаны тестовые данные.");
+      // 🔥 Senior Practice: Никаких фейковых данных! Если ошибка - массив пуст.
+      setOrders([]);
+      setError(
+        "Не удалось загрузить список заказов. Проверьте соединение с сервером.",
+      );
     } finally {
       setLoading(false);
     }
@@ -123,23 +101,27 @@ export default function Orders() {
   }, []);
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ФИЛЬТРАЦИЯ И СОРТИРОВКА (НОВОЕ)
+  // БИЗНЕС-ЛОГИКА: ФИЛЬТРАЦИЯ И СОРТИРОВКА
   // ==========================================
   const processedOrders = [...orders]
     .filter((order) => {
       // 1. Поиск по тексту (Имя клиента, ID, Описание/Источник)
-      const searchString = `${order.clientName || ""} ${order.id || ""} ${order.description || ""}`.toLowerCase();
+      const searchString =
+        `${order.clientName || ""} ${order.id || ""} ${order.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchTerm.toLowerCase());
-      
+
       // 2. Фильтр по статусу
-      const matchesStatus = filterStatus === "ALL" ? true : order.status === filterStatus;
-      
+      const matchesStatus =
+        filterStatus === "ALL" ? true : order.status === filterStatus;
+
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
       // 3. Сортировка
-      if (sortBy === "DATE_DESC") return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-      if (sortBy === "DATE_ASC") return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      if (sortBy === "DATE_DESC")
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      if (sortBy === "DATE_ASC")
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
       if (sortBy === "PRICE_DESC") return (b.price || 0) - (a.price || 0);
       if (sortBy === "PRICE_ASC") return (a.price || 0) - (b.price || 0);
       return 0;
@@ -195,7 +177,7 @@ export default function Orders() {
   const netProfit = price - totalExpenses;
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ ИЗМЕНЕНИЙ
+  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ ИЗМЕНЕНИЙ (REAL DATA)
   // ==========================================
   const handleUpdateOrder = async (e) => {
     e.preventDefault();
@@ -203,38 +185,30 @@ export default function Orders() {
 
     setIsSubmitting(true);
     try {
-      // Отправляем обновленные данные (статус, цену и массив расходов)
-      await api.put(`/orders/${editingOrder.id}`, {
+      // Отправляем обновленные данные через axios.js
+      await apiUpdateOrder(editingOrder.id, {
         status,
         price,
-        expenses: orderExpenses, // Бэкенд должен будет принять этот массив
+        expenses: orderExpenses,
       });
 
       close();
+      // Обновляем список с сервера после успешного сохранения
       fetchOrders();
     } catch (err) {
       console.error("Ошибка при обновлении заказа:", err);
-
-      // Имитация успеха для демо
-      if (error) {
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === editingOrder.id
-              ? { ...o, status, price, expenses: orderExpenses }
-              : o,
-          ),
-        );
-        close();
-      } else {
-        alert("Не удалось обновить заказ.");
-      }
+      // 🔥 Senior Update: Убрана имитация сохранения. Показываем реальную ошибку.
+      alert(
+        err.response?.data?.message ||
+          "Не удалось обновить заказ. Попробуйте позже.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ ЗАКАЗА
+  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ ЗАКАЗА (REAL DATA)
   // ==========================================
   const handleDeleteOrder = async (id) => {
     if (
@@ -243,15 +217,16 @@ export default function Orders() {
       return;
 
     try {
-      await api.delete(`/orders/${id}`);
+      await apiDeleteOrder(id);
+      // Удаляем из локального состояния только после успешного ответа сервера
       setOrders((prev) => prev.filter((order) => order.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
-      if (error) {
-        setOrders((prev) => prev.filter((order) => order.id !== id));
-      } else {
-        alert("Не удалось удалить заказ.");
-      }
+      // 🔥 Senior Update: Убрана имитация удаления.
+      alert(
+        err.response?.data?.message ||
+          "Не удалось удалить заказ. Возможно, у вас нет прав Администратора.",
+      );
     }
   };
 
@@ -341,8 +316,8 @@ export default function Orders() {
       {error && (
         <Alert
           icon={<IconAlertCircle size={16} />}
-          title="Внимание (Режим разработки)"
-          color="orange"
+          title="Внимание"
+          color="red"
           mb="xl"
           radius="md"
         >
@@ -351,7 +326,7 @@ export default function Orders() {
       )}
 
       {/* ========================================== */}
-      {/* ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ (НОВЫЙ БЛОК) */}
+      {/* ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ */}
       {/* ========================================== */}
       <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
         <Grid>
@@ -497,7 +472,7 @@ export default function Orders() {
               Заказы не найдены
             </Text>
             <Text c="dimmed" mt={5}>
-              Попробуйте изменить параметры поиска или фильтрации.
+              База данных пуста или сервер не вернул результаты.
             </Text>
           </Center>
         )}

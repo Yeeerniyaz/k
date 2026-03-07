@@ -32,7 +32,14 @@ import {
   IconEdit,
   IconPhone,
 } from "@tabler/icons-react";
-import api from "../api/index.js";
+
+// 🔥 Senior Update: Импортируем готовые методы из нового единого axios.js
+import {
+  fetchUsers as apiFetchUsers,
+  createUser as apiCreateUser,
+  updateUser as apiUpdateUser,
+  deleteUser as apiDeleteUser,
+} from "../api/axios.js";
 
 export default function Users() {
   // ==========================================
@@ -50,43 +57,28 @@ export default function Users() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState(""); // 🔥 НОВОЕ: Состояние для номера телефона
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("MANAGER");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА СОТРУДНИКОВ
+  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА СОТРУДНИКОВ (REAL DATA)
   // ==========================================
   const fetchUsers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get("/users");
+      // Используем новый метод из axios.js
+      const response = await apiFetchUsers();
       setUsers(response.data.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки сотрудников:", err);
-      // Умный фоллбэк: если бэкенд для пользователей еще не готов, покажем фейковые данные для теста UI
-      setUsers([
-        {
-          id: "1",
-          name: "Ернияз (Владелец)",
-          email: "admin@royalbanners.kz",
-          phone: "+7 701 000 00 00",
-          role: "ADMIN",
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          name: "Тестовый Менеджер",
-          email: "manager@royalbanners.kz",
-          phone: "+7 777 111 22 33",
-          role: "MANAGER",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      // 🔥 Senior Practice: Никаких фейковых данных (убрали хардкод Ернияза и Менеджера).
+      // Если сервер недоступен — показываем реальную ошибку.
+      setUsers([]);
       setError(
-        "Не удалось подключиться к базе пользователей. Показаны демонстрационные данные.",
+        "Не удалось подключиться к базе пользователей. Проверьте соединение с сервером.",
       );
     } finally {
       setLoading(false);
@@ -106,7 +98,7 @@ export default function Users() {
       setEditingId(user.id);
       setName(user.name || "");
       setEmail(user.email || "");
-      setPhone(user.phone || ""); // 🔥 Загружаем телефон, если есть
+      setPhone(user.phone || "");
       setRole(user.role || "MANAGER");
       setPassword(""); // Специально оставляем пустым для безопасности
     } else {
@@ -114,7 +106,7 @@ export default function Users() {
       setEditingId(null);
       setName("");
       setEmail("");
-      setPhone(""); // 🔥 Очищаем поле телефона
+      setPhone("");
       setRole("MANAGER");
       setPassword("");
     }
@@ -135,7 +127,7 @@ export default function Users() {
 
     setIsSubmitting(true);
 
-    // Формируем payload. Добавляем телефон. Пароль добавляем только если он был изменен или задан.
+    // Формируем payload. Пароль добавляем только если он был изменен или задан.
     const payload = { name, email, phone, role };
     if (password.trim() !== "") {
       payload.password = password;
@@ -143,41 +135,22 @@ export default function Users() {
 
     try {
       if (editingId) {
-        // Обновляем существующего (смена пароля или данных)
-        await api.put(`/users/${editingId}`, payload);
+        // Обновляем существующего через axios.js
+        await apiUpdateUser(editingId, payload);
       } else {
-        // Создаем нового
-        await api.post("/users", payload);
+        // Создаем нового через axios.js
+        await apiCreateUser(payload);
       }
 
       close();
-      fetchUsers(); // Обновляем таблицу
+      fetchUsers(); // Обновляем таблицу с сервера
     } catch (err) {
       console.error("Ошибка при сохранении пользователя:", err);
-
-      // Сеньорская заглушка для демо-режима
-      if (error) {
-        if (editingId) {
-          setUsers((prev) =>
-            prev.map((u) => (u.id === editingId ? { ...u, ...payload } : u)),
-          );
-        } else {
-          setUsers((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              ...payload,
-              createdAt: new Date().toISOString(),
-            },
-          ]);
-        }
-        close();
-      } else {
-        alert(
-          err.response?.data?.message ||
-            "Ошибка при сохранении профиля сотрудника. Возможно, email занят.",
-        );
-      }
+      // 🔥 Senior Update: Убрали локальную имитацию создания профиля. Выводим реальную ошибку БД.
+      alert(
+        err.response?.data?.message ||
+          "Ошибка при сохранении профиля сотрудника. Возможно, email занят.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -200,15 +173,13 @@ export default function Users() {
       return;
 
     try {
-      await api.delete(`/users/${id}`);
+      await apiDeleteUser(id);
+      // Удаляем из стейта только после успешного ответа сервера
       setUsers((prev) => prev.filter((user) => user.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
-      if (error) {
-        setUsers((prev) => prev.filter((user) => user.id !== id)); // Демо-удаление
-      } else {
-        alert("Не удалось удалить сотрудника.");
-      }
+      // 🔥 Senior Update: Убрана локальная демо-имитация удаления.
+      alert(err.response?.data?.message || "Не удалось удалить сотрудника.");
     }
   };
 
@@ -267,8 +238,8 @@ export default function Users() {
       {error && (
         <Alert
           icon={<IconAlertCircle size={16} />}
-          title="Внимание (Режим разработки)"
-          color="orange"
+          title="Внимание"
+          color="red"
           mb="xl"
           radius="md"
         >
@@ -336,7 +307,7 @@ export default function Users() {
                     </Group>
                   </Table.Td>
 
-                  {/* Контакты (Email + Телефон) 🔥 */}
+                  {/* Контакты (Email + Телефон) */}
                   <Table.Td>
                     <Text size="sm">{user.email}</Text>
                     {user.phone && (
@@ -382,7 +353,6 @@ export default function Users() {
                   {/* Действия */}
                   <Table.Td style={{ textAlign: "right" }}>
                     <Group gap="xs" justify="flex-end">
-                      {/* КНОПКА РЕДАКТИРОВАНИЯ - ТЕПЕРЬ ЕСТЬ У ВСЕХ */}
                       <Tooltip label="Редактировать профиль и пароль">
                         <ActionIcon
                           variant="light"
@@ -418,7 +388,8 @@ export default function Users() {
               Нет сотрудников
             </Text>
             <Text c="dimmed" mt={5}>
-              Добавьте менеджеров для работы с заказами.
+              Добавьте менеджеров для работы с заказами или проверьте
+              соединение.
             </Text>
           </Center>
         )}

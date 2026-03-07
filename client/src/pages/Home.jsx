@@ -53,7 +53,9 @@ import {
   IconDatabase,
   IconServerOff,
 } from "@tabler/icons-react";
-import api from "../api/index.js";
+
+// 🔥 Senior Update: Используем единый инстанс API из axios.js
+import api from "../api/axios.js";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -151,85 +153,12 @@ export default function Home() {
           throw new Error("Настройки пусты");
         }
       } catch (error) {
-        console.warn("API недоступно. Загружен Сеньорский фоллбэк.");
+        console.error("Ошибка загрузки данных витрины:", error);
         setIsDbConnected(false);
-
-        const demoPrices = [
-          {
-            id: "p1",
-            service: "Печать баннера (Китай 340гр)",
-            unit: "1 кв.м",
-            price: 1500,
-          },
-          {
-            id: "p2",
-            service: "Изготовление лайтбокса (стандарт)",
-            unit: "1 кв.м",
-            price: 45000,
-          },
-          {
-            id: "p3",
-            service: "Объемные световые буквы",
-            unit: "1 см высоты",
-            price: 800,
-          },
-          {
-            id: "p4",
-            service: "Разработка дизайна",
-            unit: "услуга",
-            price: 5000,
-          },
-        ];
-        setPriceList(demoPrices);
-
-        const demoConfigs = [
-          {
-            id: "banners",
-            title: "Баннеры",
-            calcType: "area",
-            fields: [
-              { name: "val1", label: "Ширина (м)" },
-              { name: "val2", label: "Высота (м)" },
-            ],
-            linkedPrices: ["p1"],
-            addons: [
-              {
-                id: "add-1",
-                name: "Люверсы (шаг 30см)",
-                type: "fixed",
-                value: 500,
-              },
-              {
-                id: "add-2",
-                name: "Срочная печать (+30%)",
-                type: "percent",
-                value: 30,
-              },
-            ],
-          },
-          {
-            id: "complex_lightbox",
-            title: "Лайтбоксы",
-            calcType: "custom",
-            customFormula:
-              "(val1 * val2 * basePrice) + ((val1 * 2 + val2 * 2) * 1500)",
-            fields: [
-              { name: "val1", label: "Ширина (м)" },
-              { name: "val2", label: "Высота (м)" },
-            ],
-            linkedPrices: ["p2"],
-            addons: [
-              {
-                id: "add-3",
-                name: "Сложный монтаж (вышка)",
-                type: "fixed",
-                value: 25000,
-              },
-            ],
-          },
-        ];
-        setCalcConfigs(demoConfigs);
-        setActiveConfigId(demoConfigs[0].id);
+        // 🔥 Senior Practice: Никаких фейковых данных для калькулятора на витрине!
+        setPriceList([]);
+        setCalcConfigs([]);
+        setActiveConfigId("");
       } finally {
         setLoadingData(false);
       }
@@ -415,7 +344,7 @@ export default function Home() {
         fontFamily: '"Google Sans", sans-serif',
         backgroundColor: "#f8f9fa",
         overflowX: "hidden", // 🔥 FIX: Убирает горизонтальный скролл на мобильных телефонах
-        width: "100%",       // 🔥 FIX: Фиксирует ширину экрана
+        width: "100%", // 🔥 FIX: Фиксирует ширину экрана
       }}
     >
       {/* Кнопка скролла наверх */}
@@ -527,7 +456,7 @@ export default function Home() {
               </Button>
             </Group>
 
-            {/* 🔥 НОВОЕ: Сверх-минималистичные соцсети прямо под кнопками */}
+            {/* Соцсети прямо под кнопками */}
             <Group mt={30} gap="lg" justify="center">
               <Tooltip
                 label="Написать в WhatsApp"
@@ -795,7 +724,7 @@ export default function Home() {
                         <Center p="xl">
                           <Loader color="white" />
                         </Center>
-                      ) : (
+                      ) : calcConfigs.length > 0 ? (
                         <>
                           <Select
                             label={
@@ -982,6 +911,22 @@ export default function Home() {
                             </Button>
                           </Box>
                         </>
+                      ) : (
+                        <Center
+                          p="xl"
+                          style={{
+                            flexDirection: "column",
+                            textAlign: "center",
+                          }}
+                        >
+                          <IconServerOff
+                            size={40}
+                            color="rgba(255,255,255,0.5)"
+                          />
+                          <Text color="white" mt="md">
+                            Калькулятор временно недоступен.
+                          </Text>
+                        </Center>
                       )}
                     </Stack>
                   ) : (
@@ -1034,7 +979,7 @@ export default function Home() {
                   {!loadingData && (
                     <Badge
                       variant="light"
-                      color={isDbConnected ? "green" : "gray"}
+                      color={isDbConnected ? "green" : "red"}
                       leftSection={
                         isDbConnected ? (
                           <IconDatabase size={12} />
@@ -1043,7 +988,7 @@ export default function Home() {
                         )
                       }
                     >
-                      {isDbConnected ? "Актуально" : "Ориентировочно"}
+                      {isDbConnected ? "Актуально" : "Нет связи"}
                     </Badge>
                   )}
                 </Group>
@@ -1083,7 +1028,7 @@ export default function Home() {
                             <Loader color="#1B2E3D" />
                           </Table.Td>
                         </Table.Tr>
-                      ) : (
+                      ) : priceList.length > 0 ? (
                         priceList.map((item, index) => (
                           <Table.Tr key={index}>
                             <Table.Td fw={500} style={{ color: "#1B2E3D" }}>
@@ -1099,6 +1044,12 @@ export default function Home() {
                             </Table.Td>
                           </Table.Tr>
                         ))
+                      ) : (
+                        <Table.Tr>
+                          <Table.Td colSpan={3} ta="center" py="xl" c="dimmed">
+                            Прайс-лист временно пуст
+                          </Table.Td>
+                        </Table.Tr>
                       )}
                     </Table.Tbody>
                   </Table>
