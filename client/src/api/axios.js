@@ -7,7 +7,7 @@ import axios from 'axios';
 // Распознаем не только ПК, но и телефон в локальной Wi-Fi сети
 
 // 🔥 SENIOR FIX: Исправлен порт с 5000 на правильный 5005 (твой бекенд работает на 5005)
-export const API_URL = meta.env.VITE_API_URL|| 'http://localhost:5005/api';
+export const API_URL = "https://ukb.yeee.kz/api"; // В продакшне указываем полный URL, так как фронт и бэк могут быть на разных доменах
 
 // Экспортируем чистый домен бэкенда (без /api на конце)
 export const BASE_URL = API_URL.replace('/api', '');
