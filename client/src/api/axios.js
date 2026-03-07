@@ -1,13 +1,14 @@
 import axios from 'axios';
 
 // ==========================================
-// 1. ИНТЕЛЛЕКТУАЛЬНАЯ КОНФИГУРАЦИЯ (СЕНЬОР-ХАК v3)
+// 1. ЖЕСТКАЯ КОНФИГУРАЦИЯ ДЛЯ VPS (SENIOR LEVEL)
 // ==========================================
+// Берем IP или домен, по которому ты открыл сайт на телефоне (например, 89.123.45.67)
+const hostname = window.location.hostname;
+const protocol = window.location.protocol;
 
-// Распознаем не только ПК, но и телефон в локальной Wi-Fi сети
-
-// 🔥 SENIOR FIX: Исправлен порт с 5000 на правильный 5005 (твой бекенд работает на 5005)
-export const API_URL = "https://ukb.yeee.kz/api"; // В продакшне указываем полный URL, так как фронт и бэк могут быть на разных доменах
+// 🔥 ЖЕСТКО указываем порт бэкенда (5005), чтобы телефон не терял сервер
+export const API_URL = import.meta.env.VITE_API_URL || `${protocol}//${hostname}:5005/api`;
 
 // Экспортируем чистый домен бэкенда (без /api на конце)
 export const BASE_URL = API_URL.replace('/api', '');
@@ -78,9 +79,8 @@ export const updatePrice = (id, priceData) => API.put(`/prices/${id}`, priceData
 export const deletePrice = (id) => API.delete(`/prices/${id}`);
 
 export const fetchPortfolio = () => API.get('/portfolio');
-export const addPortfolio = (formData) => API.post('/portfolio', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-});
+// ВАЖНО: Никаких кастомных заголовков для multipart, браузер сделает это сам!
+export const addPortfolio = (formData) => API.post('/portfolio', formData);
 export const updatePortfolioItem = (id, data) => API.put(`/portfolio/${id}`, data);
 export const deletePortfolioItem = (id) => API.delete(`/portfolio/${id}`);
 
