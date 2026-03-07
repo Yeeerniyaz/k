@@ -1,173 +1,193 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   TextInput,
   PasswordInput,
+  Paper,
   Title,
   Text,
+  Container,
   Button,
-  Stack,
-  Center,
+  Box,
   Image,
-  Flex,
-  Box
-} from '@mantine/core';
-import { IconAt, IconLock } from '@tabler/icons-react';
-import api from '../api/index.js';
+  Center,
+  Alert,
+} from "@mantine/core";
+import { IconLock, IconAt, IconAlertCircle } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
+
+// 🔥 Senior Update: Импортируем функцию логина из нового axios.js вместо старого index.js
+import { login as loginApi } from "../api/axios.js";
 
 export default function Login() {
-  // ==========================================
-  // СОСТОЯНИЯ
-  // ==========================================
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА
+  // ОБРАБОТКА ВХОДА (AUTHENTICATION)
   // ==========================================
   const handleLogin = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await api.post('/auth/login', { email, password });
-      const { token } = response.data.data;
-      
-      localStorage.setItem('royal_token', token);
-      window.location.href = '/';
+      // Валидация на фронтенде (Senior всегда проверяет данные перед отправкой)
+      if (!email || !password) {
+        throw new Error("Пожалуйста, введите логин и пароль");
+      }
+
+      const response = await loginApi({ email, password });
+
+      if (response.data && response.data.token) {
+        // Сохраняем токен в localStorage (ключ 'token', как настроено в axios.js)
+        localStorage.setItem("token", response.data.token);
+
+        // Если сервер прислал данные пользователя, сохраняем их
+        if (response.data.user) {
+          localStorage.setItem("user", JSON.stringify(response.data.user));
+        }
+
+        // Редирект на главную страницу после успешного входа
+        navigate("/admin");
+      } else {
+        throw new Error("Некорректный ответ сервера. Токен не получен.");
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Ошибка авторизации. Проверьте данные.');
+      console.error("Ошибка при входе:", err);
+      // Если бэкенд вернул сообщение об ошибке, показываем его, иначе стандартное
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Ошибка авторизации. Проверьте данные.";
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    // 🔥 СЕНЬОРСКИЙ ХАК: Flex-контейнер на весь экран, перекрывающий всё остальное
-    <Flex
-      pos="fixed"
-      top={0}
-      left={0}
-      w="100vw"
-      h="100vh"
-      style={{ zIndex: 9999, fontFamily: '"Google Sans", sans-serif' }}
-      // На мобилках колонкой (сверху вниз), на ПК строкой (слева направо)
-      direction={{ base: 'column', md: 'row' }}
+    <Box
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        backgroundColor: "#f1f3f5",
+        backgroundImage: "linear-gradient(135deg, #1B2E3D 0%, #000000 100%)", // Фирменный стиль (черный + оранжевый будет в кнопке)
+      }}
     >
-      
-      {/* ========================================== */}
-      {/* ЛЕВАЯ ЗОНА: БРЕНДИНГ (Синяя) */}
-      {/* ========================================== */}
-      <Center
-        w={{ base: '100%', md: '45%' }}
-        h={{ base: '35%', md: '100%' }}
-        bg="#1B2E3D"
-        p="xl"
-        style={{ flexDirection: 'column', textAlign: 'center' }}
-      >
-        {/* Логотип: на телефоне поменьше, на ПК побольше */}
-        <Image 
-          src="/assets/logo.svg" 
-          w={{ base: 50, md: 90 }} 
-          fit="contain" 
-          mb="md" 
-        />
-        
-        <Title
-          order={1}
-          style={{
-            fontFamily: '"Alyamama", sans-serif',
-            color: 'white',
-            letterSpacing: '2px',
-            fontSize: 'clamp(28px, 4vw, 42px)' // Адаптивный размер шрифта
-          }}
-        >
-          ROYAL BANNERS
-        </Title>
-        
-        <Text 
-          c="rgba(255, 255, 255, 0.7)" 
-          mt="sm" 
-          size="lg" 
-          visibleFrom="sm" // Показываем этот текст только на ПК
-        >
-          Единая система управления предприятием
-        </Text>
-      </Center>
+      <Container size={420} my={40}>
+        <Paper withBorder shadow="xl" p={30} radius="md" bg="white">
+          <Center mb="lg">
+            {/* Логотип или Название */}
+            <Title order={2} style={{ color: "#1B2E3D", letterSpacing: "1px" }}>
+              VECTOR{" "}
+              <Text component="span" c="orange.6" inherit>
+                ADMIN
+              </Text>
+            </Title>
+          </Center>
 
-      {/* ========================================== */}
-      {/* ПРАВАЯ ЗОНА: ФОРМА АВТОРИЗАЦИИ (Белая) */}
-      {/* ========================================== */}
-      <Center
-        w={{ base: '100%', md: '55%' }}
-        h={{ base: '65%', md: '100%' }}
-        bg="white"
-        p="xl"
-      >
-        {/* Контейнер ограничивает ширину формы, чтобы она не растягивалась на весь экран */}
-        <Box w="100%" maw={380}>
-          <Title order={2} mb={5} style={{ color: '#1B2E3D' }}>
-            Вход в систему
-          </Title>
-          <Text c="dimmed" size="sm" mb={35}>
-            Введите ваши учетные данные для доступа к панели
+          <Text c="dimmed" size="sm" ta="center" mb={30}>
+            Введите учетные данные для доступа к системе управления Royal
+            Banners
           </Text>
 
-          <form onSubmit={handleLogin}>
-            <Stack gap="md">
-              <TextInput
-                label="Email"
-                placeholder="admin@royalbanners.kz"
-                required
-                leftSection={<IconAt size={18} stroke={1.5} color="#1B2E3D" />}
-                value={email}
-                onChange={(e) => setEmail(e.currentTarget.value)}
-                error={error && " "}
-                styles={{
-                  label: { color: '#1B2E3D', fontWeight: 600, marginBottom: '6px' },
-                  input: { fontFamily: '"Google Sans", sans-serif', borderColor: error ? 'red' : '#e0e0e0' }
-                }}
-              />
-              
-              <PasswordInput
-                label="Пароль"
-                placeholder="Ваш пароль"
-                required
-                leftSection={<IconLock size={18} stroke={1.5} color="#1B2E3D" />}
-                value={password}
-                onChange={(e) => setPassword(e.currentTarget.value)}
-                error={error}
-                styles={{
-                  label: { color: '#1B2E3D', fontWeight: 600, marginBottom: '6px' },
-                  input: { fontFamily: '"Google Sans", sans-serif', borderColor: error ? 'red' : '#e0e0e0' },
-                  error: { fontFamily: '"Google Sans", sans-serif', marginTop: '6px' }
-                }}
-              />
-              
-              <Button 
-                type="submit" 
-                fullWidth 
-                mt="xl" 
-                loading={loading} 
-                radius="md"
-                size="lg"
-                style={{ 
-                  fontFamily: '"Google Sans", sans-serif', 
-                  fontWeight: 600,
-                  backgroundColor: '#1B2E3D',
-                  color: 'white',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                Войти в панель
-              </Button>
-            </Stack>
-          </form>
-        </Box>
-      </Center>
+          {error && (
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              title="Ошибка доступа"
+              color="red"
+              mb="md"
+              variant="light"
+            >
+              {error}
+            </Alert>
+          )}
 
-    </Flex>
+          <form onSubmit={handleLogin}>
+            <TextInput
+              label="Email (Логин)"
+              placeholder="admin@example.com"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.currentTarget.value)}
+              leftSection={<IconAt size={16} />}
+              mb="md"
+            />
+
+            <PasswordInput
+              label="Пароль"
+              placeholder="Ваш пароль"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.currentTarget.value)}
+              leftSection={<IconLock size={16} />}
+              mb="md"
+            />
+
+            <Button
+              fullWidth
+              mt="xl"
+              size="md"
+              type="submit"
+              loading={loading}
+              style={{
+                backgroundColor: "#FF8C00", // Твой любимый оранжевый
+                transition: "transform 0.2s ease",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = "scale(1.02)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = "scale(1)")
+              }
+            >
+              Войти в систему
+            </Button>
+          </form>
+
+          <Divider
+            my="lg"
+            label="Royal Banners Security"
+            labelPosition="center"
+          />
+
+          <Text size="xs" c="dimmed" ta="center">
+            Версия системы: 1.0.0-stable (YEEE Edition) <br />© 2024 Royal
+            Banners. Все права защищены.
+          </Text>
+        </Paper>
+      </Container>
+    </Box>
+  );
+}
+
+// Вспомогательный компонент Divider, если он не импортирован из Mantine
+function Divider({ my, label, labelPosition }) {
+  return (
+    <Box style={{ position: "relative", margin: `${my}px 0` }}>
+      <hr style={{ border: "none", borderTop: "1px solid #dee2e6" }} />
+      <Text
+        size="xs"
+        c="dimmed"
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: labelPosition === "center" ? "50%" : "0",
+          transform:
+            labelPosition === "center"
+              ? "translate(-50%, -50%)"
+              : "translateY(-50%)",
+          backgroundColor: "white",
+          padding: "0 10px",
+        }}
+      >
+        {label}
+      </Text>
+    </Box>
   );
 }

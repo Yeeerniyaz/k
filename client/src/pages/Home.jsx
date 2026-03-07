@@ -414,6 +414,8 @@ export default function Home() {
       style={{
         fontFamily: '"Google Sans", sans-serif',
         backgroundColor: "#f8f9fa",
+        overflowX: "hidden", // 🔥 FIX: Убирает горизонтальный скролл на мобильных телефонах
+        width: "100%",       // 🔥 FIX: Фиксирует ширину экрана
       }}
     >
       {/* Кнопка скролла наверх */}

@@ -1,196 +1,297 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-  Title, Text, Grid, Card, Group, ThemeIcon, Skeleton, Alert, Table, Badge, Paper, Divider, Box, Stack, Center, TextInput, Button, Progress, Tooltip // 🔥 Tooltip осында қосылды!
-} from '@mantine/core';
-import { 
-  IconShoppingCart, IconUsers, IconPhoto, IconAlertCircle,
-  IconTrendingUp, IconTrendingDown, IconWallet, IconBusinessplan, 
-  IconCalendarEvent, IconFilter, IconReceipt2, IconBuildingSkyscraper
-} from '@tabler/icons-react';
-import api from '../api/index.js';
+  Title,
+  Text,
+  Grid,
+  Card,
+  Group,
+  ThemeIcon,
+  Skeleton,
+  Alert,
+  Table,
+  Badge,
+  Paper,
+  Divider,
+  Box,
+  Stack,
+  Center,
+  TextInput,
+  Button,
+  Progress,
+  Tooltip,
+} from "@mantine/core";
+import {
+  IconShoppingCart,
+  IconUsers,
+  IconPhoto,
+  IconAlertCircle,
+  IconTrendingUp,
+  IconTrendingDown,
+  IconWallet,
+  IconBusinessplan,
+  IconCalendarEvent,
+  IconFilter,
+  IconReceipt2,
+  IconBuildingSkyscraper,
+} from "@tabler/icons-react";
+
+// 🔥 Senior Update: Импортируем из единого axios.js и используем именованный импорт для чистоты
+import API, { fetchDashboardStats } from "../api/axios.js";
 
 export default function Dashboard() {
   // ==========================================
-  // СОСТОЯНИЯ ДАННЫХ
+  // СОСТОЯНИЯ ДАННЫХ (STATE MANAGEMENT)
   // ==========================================
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // ФИЛЬТРЫ ПО ДАТЕ
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
 
-  // Расширенная структура данных для детального финансового учета
+  // ФИЛЬТРЫ ПО ДАТЕ
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  // Инициализация структуры данных (изначально всё по нулям - CLEAN DATA)
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalRevenue: 0,
-    orderExpenses: 0,     // Расходы только по заказам (себестоимость)
-    companyExpenses: 0,   // Общие расходы фирмы (аренда, реклама)
-    totalExpenses: 0,     // Все расходы ВМЕСТЕ
-    netProfit: 0,     
+    orderExpenses: 0, // Себестоимость (материалы, работа)
+    companyExpenses: 0, // Операционка (аренда, налоги)
+    totalExpenses: 0, // Итоговый расход
+    netProfit: 0,
     totalUsers: 0,
     totalPortfolio: 0,
-    recentOrders: []
+    recentOrders: [],
   });
 
   // ==========================================
-  // ЗАГРУЗКА ДАННЫХ (API)
+  // МЕТОД ЗАГРУЗКИ АНАЛИТИКИ (REAL DATA ONLY)
   // ==========================================
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      // Передаем параметры даты в API
-      const response = await api.get('/analytics', {
-        params: { from: dateFrom, to: dateTo }
-      });
-      
-      if (response.data && response.data.data) {
+      setError(null);
+
+      // Формируем параметры запроса
+      const params = {};
+      if (dateFrom) params.from = dateFrom;
+      if (dateTo) params.to = dateTo;
+
+      // Используем новую функцию из axios.js
+      const response = await fetchDashboardStats(params);
+
+      if (response.data && response.data.success) {
         const data = response.data.data;
-        const calcTotalExpenses = (data.orderExpenses || 0) + (data.companyExpenses || 0);
-        const profit = data.netProfit !== undefined ? data.netProfit : (data.totalRevenue || 0) - calcTotalExpenses;
-        
-        setStats(prev => ({ 
-          ...prev, 
-          ...data,
+
+        // Расчет агрегированных данных на стороне клиента (для надежности)
+        const calcOrderExp = data.orderExpenses || 0;
+        const calcCompExp = data.companyExpenses || 0;
+        const calcTotalExpenses = calcOrderExp + calcCompExp;
+        const calcRevenue = data.totalRevenue || 0;
+        const profit =
+          data.netProfit !== undefined
+            ? data.netProfit
+            : calcRevenue - calcTotalExpenses;
+
+        setStats({
+          totalOrders: data.totalOrders || 0,
+          totalRevenue: calcRevenue,
+          orderExpenses: calcOrderExp,
+          companyExpenses: calcCompExp,
           totalExpenses: calcTotalExpenses,
-          netProfit: profit
-        }));
+          netProfit: profit,
+          totalUsers: data.totalUsers || 0,
+          totalPortfolio: data.totalPortfolio || 0,
+          recentOrders: data.recentOrders || [],
+        });
       }
     } catch (err) {
-      console.error('Ошибка загрузки аналитики:', err);
-      // СЕНЬОРСКИЙ ФОЛЛБЭК: Продвинутые тестовые данные с учетом новых расходов
-      const mockOrderExpenses = 1150000;
-      const mockCompanyExpenses = 1000000;
-      const mockTotalExpenses = mockOrderExpenses + mockCompanyExpenses;
-      const mockRevenue = 5450000;
-
+      console.error("Критическая ошибка при получении аналитики:", err);
+      // Сбрасываем в 0, если сервер недоступен, чтобы не вводить в заблуждение фейками
       setStats({
-        totalOrders: 142,
-        totalRevenue: mockRevenue,
-        orderExpenses: mockOrderExpenses,
-        companyExpenses: mockCompanyExpenses,
-        totalExpenses: mockTotalExpenses,
-        netProfit: mockRevenue - mockTotalExpenses,     
-        totalUsers: 4,
-        totalPortfolio: 28,
-        recentOrders: [
-          { id: 'ord-8f7a9', clientName: 'TOO Alpha Group', status: 'COMPLETED', price: 450000, date: new Date().toISOString() },
-          { id: 'ord-2b3c4', clientName: 'Заявка с Калькулятора', status: 'PENDING', price: 120000, date: new Date().toISOString() },
-          { id: 'ord-1a2b3', clientName: 'Салон Красоты (Свяжитесь с нами)', status: 'NEW', price: 85000, date: new Date().toISOString() },
-        ]
+        totalOrders: 0,
+        totalRevenue: 0,
+        orderExpenses: 0,
+        companyExpenses: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        totalUsers: 0,
+        totalPortfolio: 0,
+        recentOrders: [],
       });
-      setError('Работа в автономном режиме. Показана расширенная тестовая сводка.');
+      setError(
+        "Ошибка соединения с сервером. Не удалось получить актуальные финансовые данные.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // Эффект первичной инициализации
   useEffect(() => {
     fetchAnalytics();
   }, []);
 
   // ==========================================
-  // ФУНКЦИИ ФОРМАТИРОВАНИЯ
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ РЕНДЕРИНГА
   // ==========================================
   const renderStatusBadge = (status) => {
-    switch (status) {
-      case 'COMPLETED': return <Badge color="green" variant="light">Выполнен</Badge>;
-      case 'PENDING': return <Badge color="orange" variant="light">В работе</Badge>;
-      case 'CANCELED': return <Badge color="red" variant="light">Отменен</Badge>;
-      case 'NEW': return <Badge color="blue" variant="light">Новый (Лид)</Badge>;
-      default: return <Badge color="gray" variant="light">{status}</Badge>;
-    }
+    const statusMap = {
+      COMPLETED: { label: "Выполнен", color: "green" },
+      PENDING: { label: "В работе", color: "orange" },
+      CANCELED: { label: "Отменен", color: "red" },
+      NEW: { label: "Новый (Лид)", color: "blue" },
+    };
+    const config = statusMap[status] || { label: status, color: "gray" };
+    return (
+      <Badge color={config.color} variant="light">
+        {config.label}
+      </Badge>
+    );
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('ru-RU');
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString("ru-RU");
   };
 
-  // ==========================================
-  // КОНФИГУРАЦИЯ КАРТОЧЕК
-  // ==========================================
+  // КОНФИГУРАЦИЯ ФИНАНСОВЫХ КАРТОЧЕК
   const financialCards = [
-    { title: 'Оборот (Выручка)', value: stats.totalRevenue, icon: IconTrendingUp, color: 'teal', prefix: '+' },
-    { title: 'Все Расходы (Вместе)', value: stats.totalExpenses, icon: IconTrendingDown, color: 'red', prefix: '-' },
-    { title: 'Чистая прибыль', value: stats.netProfit, icon: IconWallet, color: 'royalBlue', prefix: stats.netProfit > 0 ? '+' : '' },
+    {
+      title: "Оборот (Выручка)",
+      value: stats.totalRevenue,
+      icon: IconTrendingUp,
+      color: "teal",
+      prefix: "+",
+    },
+    {
+      title: "Все Расходы (Вместе)",
+      value: stats.totalExpenses,
+      icon: IconTrendingDown,
+      color: "red",
+      prefix: "-",
+    },
+    {
+      title: "Чистая прибыль",
+      value: stats.netProfit,
+      icon: IconWallet,
+      color: "indigo",
+      prefix: stats.netProfit >= 0 ? "+" : "",
+    },
   ];
 
+  // КОНФИГУРАЦИЯ ОПЕРАЦИОННЫХ КАРТОЧЕК
   const operationalCards = [
-    { title: 'Всего лидов и заказов', value: stats.totalOrders, icon: IconShoppingCart, color: 'indigo' },
-    { title: 'Сотрудники в системе', value: stats.totalUsers, icon: IconUsers, color: 'orange' },
-    { title: 'Работ в портфолио', value: stats.totalPortfolio, icon: IconPhoto, color: 'grape' },
+    {
+      title: "Всего лидов и заказов",
+      value: stats.totalOrders,
+      icon: IconShoppingCart,
+      color: "indigo",
+    },
+    {
+      title: "Сотрудники в системе",
+      value: stats.totalUsers,
+      icon: IconUsers,
+      color: "orange",
+    },
+    {
+      title: "Работ в портфолио",
+      value: stats.totalPortfolio,
+      icon: IconPhoto,
+      color: "grape",
+    },
   ];
 
-  // Проценты для Progress Bar (структура расходов)
-  const orderExpPercent = stats.totalExpenses > 0 ? Math.round((stats.orderExpenses / stats.totalExpenses) * 100) : 0;
-  const companyExpPercent = stats.totalExpenses > 0 ? Math.round((stats.companyExpenses / stats.totalExpenses) * 100) : 0;
+  // Расчет долей расходов для визуализации
+  const orderExpPercent =
+    stats.totalExpenses > 0
+      ? Math.round((stats.orderExpenses / stats.totalExpenses) * 100)
+      : 0;
+  const companyExpPercent =
+    stats.totalExpenses > 0
+      ? Math.round((stats.companyExpenses / stats.totalExpenses) * 100)
+      : 0;
 
   return (
     <div style={{ fontFamily: '"Google Sans", sans-serif' }}>
       <Group justify="space-between" align="flex-end" mb="xl">
-        <div>
-          <Title order={2} mb="xs" style={{ color: '#1B2E3D' }}>
+        <Box>
+          <Title order={2} mb="xs" style={{ color: "#1B2E3D" }}>
             Аналитика и Дашборд
           </Title>
           <Text c="dimmed">
-            Глобальные показатели бизнеса Royal Banners.
+            Контроль ключевых показателей бизнеса Royal Banners в режиме
+            реального времени.
           </Text>
-        </div>
+        </Box>
       </Group>
 
-      {/* ========================================== */}
-      {/* ФИЛЬТР ПО ПЕРИОДУ (ДАТЫ) */}
-      {/* ========================================== */}
+      {/* ФИЛЬТРАЦИЯ */}
       <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
         <Group justify="space-between" align="flex-end">
           <Group align="flex-end">
-            <TextInput 
-              type="date" 
-              label="Период с" 
-              value={dateFrom} 
-              onChange={(e) => setDateFrom(e.currentTarget.value)} 
+            <TextInput
+              type="date"
+              label="С даты"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.currentTarget.value)}
               leftSection={<IconCalendarEvent size={16} />}
             />
-            <TextInput 
-              type="date" 
-              label="Период по" 
-              value={dateTo} 
-              onChange={(e) => setDateTo(e.currentTarget.value)} 
+            <TextInput
+              type="date"
+              label="По дату"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.currentTarget.value)}
               leftSection={<IconCalendarEvent size={16} />}
             />
-            <Button 
-              onClick={fetchAnalytics} 
+            <Button
+              onClick={fetchAnalytics}
               leftSection={<IconFilter size={16} />}
-              style={{ backgroundColor: '#1B2E3D' }}
+              style={{ backgroundColor: "#1B2E3D" }}
             >
-              Показать данные
+              Обновить отчет
             </Button>
           </Group>
-          <Badge color="blue" variant="light" size="lg" radius="sm">
-            {dateFrom || dateTo ? 'Выбранный период' : 'За все время'}
+          <Badge color="blue" variant="filled" size="lg" radius="sm">
+            {dateFrom || dateTo ? "Выбранный период" : "Весь период"}
           </Badge>
         </Group>
       </Paper>
 
       {error && (
-        <Alert icon={<IconAlertCircle size={16} />} title="Инженерный режим" color="orange" mb="xl" radius="md">
+        <Alert
+          icon={<IconAlertCircle size={16} />}
+          title="Внимание"
+          color="red"
+          mb="xl"
+          radius="md"
+          variant="light"
+        >
           {error}
         </Alert>
       )}
 
-      {/* ========================================== */}
-      {/* БЛОК 1: ГЛАВНЫЕ ФИНАНСОВЫЕ КАРТОЧКИ */}
-      {/* ========================================== */}
+      {/* ГЛАВНЫЕ МЕТРИКИ */}
       <Grid mb="lg">
         {financialCards.map((stat, index) => (
           <Grid.Col span={{ base: 12, md: 4 }} key={index}>
-            <Card withBorder padding="lg" radius="md" shadow="sm" style={{ borderTop: `4px solid var(--mantine-color-${stat.color}-filled)` }}>
+            <Card
+              withBorder
+              padding="lg"
+              radius="md"
+              shadow="sm"
+              style={{
+                borderTop: `4px solid var(--mantine-color-${stat.color}-filled)`,
+              }}
+            >
               <Group justify="space-between">
                 <Text size="sm" c="dimmed" fw={600} tt="uppercase">
                   {stat.title}
                 </Text>
-                <ThemeIcon color={stat.color} variant="light" size={38} radius="md">
+                <ThemeIcon
+                  color={stat.color}
+                  variant="light"
+                  size={38}
+                  radius="md"
+                >
                   <stat.icon size={20} stroke={1.5} />
                 </ThemeIcon>
               </Group>
@@ -199,42 +300,57 @@ export default function Dashboard() {
                 {loading ? (
                   <Skeleton height={36} width="70%" />
                 ) : (
-                  <Text style={{ 
-                    fontSize: '28px', 
-                    fontWeight: 700, 
-                    color: stat.title === 'Чистая прибыль' ? '#1B2E3D' : (stat.color === 'red' ? '#fa5252' : '#2b8a3e') 
-                  }}>
-                    {stat.prefix}{stat.value.toLocaleString('ru-RU')} ₸
+                  <Text
+                    style={{
+                      fontSize: "28px",
+                      fontWeight: 700,
+                      color: "#1B2E3D",
+                    }}
+                  >
+                    {stat.prefix}
+                    {stat.value.toLocaleString("ru-RU")} ₸
                   </Text>
                 )}
               </Group>
-              
+
               <Text size="xs" c="dimmed" mt={7}>
-                <IconBusinessplan size={12} stroke={1.5} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                {dateFrom || dateTo ? 'За выбранный период' : 'За весь период учета'}
+                Данные за {dateFrom || dateTo ? "период" : "все время"}
               </Text>
             </Card>
           </Grid.Col>
         ))}
       </Grid>
 
-      {/* ========================================== */}
-      {/* БЛОК 1.1: ДЕТАЛЬНАЯ СТРУКТУРА РАСХОДОВ */}
-      {/* ========================================== */}
-      <Paper withBorder p="xl" radius="md" shadow="sm" mb="xl" style={{ borderLeft: '4px solid #fa5252' }}>
-        <Title order={5} mb="sm" style={{ color: '#1B2E3D' }}>Структура общих расходов</Title>
-        <Text size="sm" c="dimmed" mb="lg">Показывает соотношение прямых затрат на заказы и операционных расходов компании.</Text>
-        
+      {/* ДЕТАЛИЗАЦИЯ РАСХОДОВ */}
+      <Paper
+        withBorder
+        p="xl"
+        radius="md"
+        shadow="sm"
+        mb="xl"
+        style={{ borderLeft: "4px solid #fa5252" }}
+      >
+        <Title order={5} mb="sm" style={{ color: "#1B2E3D" }}>
+          Распределение расходов
+        </Title>
+        <Text size="sm" c="dimmed" mb="lg">
+          Анализ прямых и косвенных затрат предприятия.
+        </Text>
+
         {loading ? (
           <Skeleton height={20} radius="xl" mb="md" />
         ) : (
           <Progress.Root size="xl" radius="xl" mb="md">
-            <Tooltip label={`Себестоимость заказов: ${stats.orderExpenses.toLocaleString('ru-RU')} ₸ (${orderExpPercent}%)`}>
+            <Tooltip
+              label={`Себестоимость: ${stats.orderExpenses.toLocaleString("ru-RU")} ₸`}
+            >
               <Progress.Section value={orderExpPercent} color="red">
                 <Progress.Label>Заказы ({orderExpPercent}%)</Progress.Label>
               </Progress.Section>
             </Tooltip>
-            <Tooltip label={`Расходы фирмы: ${stats.companyExpenses.toLocaleString('ru-RU')} ₸ (${companyExpPercent}%)`}>
+            <Tooltip
+              label={`Фирма: ${stats.companyExpenses.toLocaleString("ru-RU")} ₸`}
+            >
               <Progress.Section value={companyExpPercent} color="orange">
                 <Progress.Label>Фирма ({companyExpPercent}%)</Progress.Label>
               </Progress.Section>
@@ -245,19 +361,31 @@ export default function Dashboard() {
         <Grid mt="md">
           <Grid.Col span={{ base: 12, sm: 6 }}>
             <Group>
-              <ThemeIcon color="red" variant="light" radius="md"><IconReceipt2 size={18} /></ThemeIcon>
+              <ThemeIcon color="red" variant="light" radius="md">
+                <IconReceipt2 size={18} />
+              </ThemeIcon>
               <div>
-                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Себестоимость заказов</Text>
-                <Text fw={700} size="lg" style={{ color: '#1B2E3D' }}>{stats.orderExpenses.toLocaleString('ru-RU')} ₸</Text>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                  Себестоимость производства
+                </Text>
+                <Text fw={700} size="lg" style={{ color: "#1B2E3D" }}>
+                  {stats.orderExpenses.toLocaleString("ru-RU")} ₸
+                </Text>
               </div>
             </Group>
           </Grid.Col>
           <Grid.Col span={{ base: 12, sm: 6 }}>
             <Group>
-              <ThemeIcon color="orange" variant="light" radius="md"><IconBuildingSkyscraper size={18} /></ThemeIcon>
+              <ThemeIcon color="orange" variant="light" radius="md">
+                <IconBuildingSkyscraper size={18} />
+              </ThemeIcon>
               <div>
-                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Общие расходы фирмы (Аренда, ЗП)</Text>
-                <Text fw={700} size="lg" style={{ color: '#1B2E3D' }}>{stats.companyExpenses.toLocaleString('ru-RU')} ₸</Text>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                  Общие расходы компании
+                </Text>
+                <Text fw={700} size="lg" style={{ color: "#1B2E3D" }}>
+                  {stats.companyExpenses.toLocaleString("ru-RU")} ₸
+                </Text>
               </div>
             </Group>
           </Grid.Col>
@@ -266,26 +394,35 @@ export default function Dashboard() {
 
       <Divider my="xl" />
 
-      {/* ========================================== */}
-      {/* БЛОК 2: ОПЕРАЦИОННЫЕ ПОКАЗАТЕЛИ И АКТИВНОСТЬ */}
-      {/* ========================================== */}
+      {/* ОПЕРАЦИОНКА И ТАБЛИЦА */}
       <Grid gutter="xl">
         <Grid.Col span={{ base: 12, md: 4 }}>
-          <Title order={4} mb="md" style={{ color: '#1B2E3D' }}>Операционная сводка</Title>
+          <Title order={4} mb="md" style={{ color: "#1B2E3D" }}>
+            Активность
+          </Title>
           <Stack gap="md">
             {operationalCards.map((stat, index) => (
               <Paper key={index} withBorder p="md" radius="md" shadow="sm">
                 <Group justify="space-between">
                   <Group gap="sm">
-                    <ThemeIcon color={stat.color} variant="light" size={38} radius="md">
+                    <ThemeIcon
+                      color={stat.color}
+                      variant="light"
+                      size={38}
+                      radius="md"
+                    >
                       <stat.icon size={20} stroke={1.5} />
                     </ThemeIcon>
-                    <Text fw={600} style={{ color: '#1B2E3D' }}>{stat.title}</Text>
+                    <Text fw={600} style={{ color: "#1B2E3D" }}>
+                      {stat.title}
+                    </Text>
                   </Group>
                   {loading ? (
                     <Skeleton height={24} width={40} />
                   ) : (
-                    <Title order={3} style={{ color: '#1B2E3D' }}>{stat.value}</Title>
+                    <Title order={3} style={{ color: "#1B2E3D" }}>
+                      {stat.value}
+                    </Title>
                   )}
                 </Group>
               </Paper>
@@ -294,25 +431,34 @@ export default function Dashboard() {
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Group justify="space-between" mb="md">
-            <Title order={4} style={{ color: '#1B2E3D' }}>Свежие заявки и заказы</Title>
-            <Badge color="gray" variant="light">Показаны последние активности</Badge>
-          </Group>
-          
-          <Paper withBorder radius="md" p={0} shadow="sm" style={{ overflow: 'hidden' }}>
+          <Title order={4} mb="md" style={{ color: "#1B2E3D" }}>
+            Последние транзакции
+          </Title>
+
+          <Paper
+            withBorder
+            radius="md"
+            p={0}
+            shadow="sm"
+            style={{ overflow: "hidden" }}
+          >
             {loading ? (
               <Box p="md">
-                <Skeleton height={40} mb="sm" radius="sm" />
-                <Skeleton height={40} mb="sm" radius="sm" />
-                <Skeleton height={40} radius="sm" />
+                <Skeleton height={40} mb="sm" />
+                <Skeleton height={40} mb="sm" />
+                <Skeleton height={40} />
               </Box>
-            ) : stats.recentOrders && stats.recentOrders.length > 0 ? (
-              <Table striped highlightOnHover verticalSpacing="md" horizontalSpacing="md">
-                <Table.Thead style={{ backgroundColor: '#f8f9fa' }}>
+            ) : stats.recentOrders.length > 0 ? (
+              <Table
+                striped
+                highlightOnHover
+                verticalSpacing="md"
+                horizontalSpacing="md"
+              >
+                <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
                   <Table.Tr>
                     <Table.Th>Дата</Table.Th>
-                    <Table.Th>ID / Источник</Table.Th>
-                    <Table.Th>Клиент / Детали</Table.Th>
+                    <Table.Th>Клиент</Table.Th>
                     <Table.Th>Статус</Table.Th>
                     <Table.Th ta="right">Сумма</Table.Th>
                   </Table.Tr>
@@ -320,21 +466,32 @@ export default function Dashboard() {
                 <Table.Tbody>
                   {stats.recentOrders.map((order) => (
                     <Table.Tr key={order.id}>
-                      <Table.Td c="dimmed" fz="sm">{formatDate(order.date)}</Table.Td>
-                      <Table.Td fw={500} style={{ color: '#1B2E3D' }}>{order.id.slice(0, 8).toUpperCase()}</Table.Td>
-                      <Table.Td>{order.clientName || 'Неизвестно'}</Table.Td>
+                      <Table.Td c="dimmed" fz="sm">
+                        {formatDate(order.date)}
+                      </Table.Td>
+                      <Table.Td fw={500} style={{ color: "#1B2E3D" }}>
+                        {order.clientName || "Без имени"}
+                      </Table.Td>
                       <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
-                      <Table.Td ta="right" fw={600} style={{ color: '#1B2E3D' }}>
-                        {order.price ? `${order.price.toLocaleString('ru-RU')} ₸` : '-'}
+                      <Table.Td
+                        ta="right"
+                        fw={600}
+                        style={{ color: "#1B2E3D" }}
+                      >
+                        {order.price
+                          ? `${order.price.toLocaleString("ru-RU")} ₸`
+                          : "-"}
                       </Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
               </Table>
             ) : (
-              <Center py="xl" style={{ flexDirection: 'column' }}>
+              <Center py="xl" style={{ flexDirection: "column" }}>
                 <IconShoppingCart size={40} color="#e0e0e0" />
-                <Text c="dimmed" mt="md">Пока нет данных о транзакциях за этот период.</Text>
+                <Text c="dimmed" mt="md">
+                  За выбранный период данных нет
+                </Text>
               </Center>
             )}
           </Paper>

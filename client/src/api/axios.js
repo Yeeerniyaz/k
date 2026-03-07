@@ -1,53 +1,54 @@
 import axios from 'axios';
 
 // ==========================================
-// 1. СОЗДАНИЕ ЭКЗЕМПЛЯРА AXIOS (SINGLETON)
+// 1. ИНТЕЛЛЕКТУАЛЬНАЯ КОНФИГУРАЦИЯ (СЕНЬОР-ХАК)
 // ==========================================
-// Базовый URL берется из .env или используется локальный сервер по умолчанию.
+// Автоматически определяем, где запущен фронтенд.
+// Если на локальном ПК (localhost) - стучимся на боевой VPS (ukb.yeee.kz) или локальный порт.
+// Если проект уже скомпилирован на VPS - используем относительный путь '/api' или VITE_API_URL.
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_URL = isLocalDev
+    ? (import.meta.env.VITE_API_URL || 'https://ukb.yeee.kz/api')
+    : (import.meta.env.VITE_API_URL || '/api');
+
 const API = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+    baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
 // ==========================================
-// 2. REQUEST INTERCEPTOR (АВТО-ТОКЕН)
+// 2. ИНТЕРСЕПТОР ЗАПРОСОВ (АВТО-ТОКЕН)
 // ==========================================
-// Перед каждым запросом на бэкенд, эта функция проверяет наличие токена.
-// Если токен есть — добавляет его в заголовок Authorization.
 API.interceptors.request.use(
     (config) => {
+        // Единый стандарт ключа: 'token'
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 // ==========================================
-// 3. RESPONSE INTERCEPTOR (ОБРАБОТКА ОШИБОК)
+// 3. ИНТЕРСЕПТОР ОТВЕТОВ (ГЛОБАЛЬНАЯ ОШИБКА 401)
 // ==========================================
-// Если бэкенд вернет 401 (токен протух), мы автоматически очищаем сессию.
 API.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            console.error('Сессия истекла или токен невалиден. Разлогиниваем...');
+            console.warn('🚨 Сессия истекла. Доступ закрыт.');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            
+
             // Если мы не на странице логина, делаем редирект
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login';
             }
         }
-        
-        // Сеньорский подход: пробрасываем ошибку дальше для обработки в UI (через Mantine Notifications)
         return Promise.reject(error);
     }
 );
@@ -55,6 +56,14 @@ API.interceptors.response.use(
 // ==========================================
 // 4. API ЭНДПОИНТЫ (МЕТОДЫ)
 // ==========================================
+
+// --- AUTH (Авторизация) ---
+export const login = (credentials) => API.post('/auth/login', credentials);
+export const getMe = () => API.get('/auth/me');
+export const logout = () => API.post('/auth/logout');
+
+// --- ANALYTICS ---
+export const fetchDashboardStats = (params) => API.get('/analytics/dashboard', { params });
 
 // --- ORDERS (Заказы) ---
 export const fetchOrders = () => API.get('/orders');
@@ -76,12 +85,11 @@ export const deletePrice = (id) => API.delete(`/prices/${id}`);
 
 // --- PORTFOLIO (Наши работы) ---
 export const fetchPortfolio = () => API.get('/portfolio');
-// Для портфолио используем multipart/form-data для передачи файлов
 export const addPortfolio = (formData) => API.post('/portfolio', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
 });
-export const updatePortfolio = (id, data) => API.put(`/portfolio/${id}`, data);
-export const deletePortfolio = (id) => API.delete(`/portfolio/${id}`);
+export const updatePortfolioItem = (id, data) => API.put(`/portfolio/${id}`, data);
+export const deletePortfolioItem = (id) => API.delete(`/portfolio/${id}`);
 
 // --- USERS (Персонал) ---
 export const fetchUsers = () => API.get('/users');
@@ -89,8 +97,5 @@ export const createUser = (userData) => API.post('/users', userData);
 export const updateUser = (id, userData) => API.put(`/users/${id}`, userData);
 export const deleteUser = (id) => API.delete(`/users/${id}`);
 
-// --- AUTH (Авторизация) ---
-export const login = (credentials) => API.post('/auth/login', credentials);
-export const getMe = () => API.get('/auth/me');
-
+// Экспортируем сам инстанс по умолчанию (на случай, если где-то нужен прямой вызов API.get(...))
 export default API;
