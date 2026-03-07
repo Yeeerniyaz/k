@@ -5,6 +5,16 @@ import { uploadImage } from '../services/cloudinary.service.js';
 import { catchAsync } from '../utils/catchAsync.js';
 import { AppError } from '../utils/AppError.js';
 
+
+const categoryMap = {
+    'banners': 'BANNERS',
+    'lightboxes': 'LIGHTBOXES',
+    'signboards': 'SIGNBOARDS',
+    '3d-figures': 'FIGURES_3D',
+    'metal-frames': 'METAL_FRAMES',
+    'pos-materials': 'POS_MATERIALS'
+};
+
 // ==========================================
 // 1. ПОЛУЧЕНИЕ ВСЕХ РАБОТ ДЛЯ ВИТРИНЫ
 // ==========================================
@@ -24,42 +34,37 @@ export const getPortfolio = catchAsync(async (req, res, next) => {
 // ==========================================
 // 2. ДОБАВЛЕНИЕ НОВОЙ РАБОТЫ В ПОРТФОЛИО
 // ==========================================
+
+
 export const addPortfolioItem = catchAsync(async (req, res, next) => {
     const { title, category, description } = req.body;
 
-    // Оставляем поддержку старого способа (если передана просто текстовая ссылка)
-    let imageUrl = req.body.imageUrl;
-
-    // Если пользователь прикрепил реальный файл (фото с телефона или ПК)
-    if (req.file) {
-        // Телепортируем файл из оперативной памяти прямо в Cloudinary
-        const uploadResult = await uploadImage(req.file.buffer, 'royal_banners_portfolio');
-        // Cloudinary сам сжал фото, перевел в WebP и вернул нам готовую ссылку
-        imageUrl = uploadResult.secure_url;
+    if (!req.file) {
+        return next(new AppError('Пожалуйста, загрузите изображение', 400));
     }
 
-    // Строгая проверка: у нас в итоге должна быть картинка (либо загруженная, либо ссылкой)
-    if (!title || !category || !imageUrl) {
-        return next(new AppError('Название, категория и картинка (файл или ссылка) обязательны', 400));
-    }
+    // 🔥 СЕНЬОРСКИЙ FIX: Переводим категорию с фронтенда в формат Prisma Enum
+    const dbCategory = categoryMap[category] // Если вдруг не совпало, по умолчанию BANNERS
 
-    // Сохраняем запись в базу данных
-    const newItem = await prisma.portfolio.create({
+    // Загружаем в Cloudinary
+    const result = await uploadImage(req.file.buffer, 'royal_banners_portfolio');
+
+    // Сохраняем в базу с ПРАВИЛЬНОЙ категорией
+    const portfolioItem = await prisma.portfolio.create({
         data: {
             title,
-            category, // Должно совпадать с ServiceCategory из schema.prisma
-            imageUrl, // Теперь здесь всегда надежная и быстрая ссылка
+            category: dbCategory, // Используем отмапленную категорию
+            imageUrl: result.secure_url,
+            publicId: result.public_id,
             description
         }
     });
 
     res.status(201).json({
-        status: 'success',
-        message: 'Работа успешно добавлена в портфолио',
-        data: newItem
+        success: true,
+        data: portfolioItem
     });
 });
-
 // 🔥 НОВОЕ: УДАЛЕНИЕ РАБОТЫ (ДЛЯ АДМИНКИ)
 // ==========================================
 // 3. УДАЛЕНИЕ РАБОТЫ ИЗ БАЗЫ
