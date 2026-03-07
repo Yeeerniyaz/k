@@ -14,7 +14,6 @@ import {
   Select,
   NumberInput,
   TextInput,
-  Textarea, // 🔥 FIX: Добавили импорт Textarea!
   Badge,
   Center,
   Stack,
@@ -39,7 +38,7 @@ import {
   IconBusinessplan,
 } from "@tabler/icons-react";
 
-// Импортируем готовые методы из нового axios.js
+// 🔥 Senior Update: Импортируем готовые методы из нового axios.js
 import {
   fetchExpenses as apiFetchExpenses,
   addExpense as apiAddExpense,
@@ -76,7 +75,7 @@ export default function Finance() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Категории, адаптированные под специфику Royal Banners
+  // 🔥 Категории, адаптированные под специфику Royal Banners
   const expenseCategories = [
     "Аренда цеха / офиса",
     "Зарплата (Оклад / Премии)",
@@ -100,6 +99,7 @@ export default function Finance() {
       setExpenses(response.data?.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки общих расходов:", err);
+      // 🔥 Senior Practice: Никаких фейков в финансах! Если ошибка - ставим пустой массив.
       setExpenses([]);
       setError(
         "Не удалось подключиться к базе данных. Проверьте соединение с сервером.",
@@ -203,6 +203,7 @@ export default function Finance() {
       fetchExpenses(); // Обновляем данные напрямую с сервера после успеха
     } catch (err) {
       console.error("Ошибка при сохранении расхода:", err);
+      // 🔥 Senior Update: Показываем реальную ошибку с бэкенда.
       alert(err.response?.data?.message || "Ошибка при сохранении транзакции.");
     } finally {
       setIsSubmitting(false);
