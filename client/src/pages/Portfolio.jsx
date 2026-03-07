@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Title,
   Text,
@@ -33,8 +33,13 @@ import {
   IconSearch,
   IconFilter,
   IconArrowsSort,
+  IconZoomIn,
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 
+// 🔥 Senior Update: Импортируем готовые методы из нового axios.js
 import {
   fetchPortfolio as apiFetchPortfolio,
   addPortfolio as apiAddPortfolio,
@@ -64,9 +69,17 @@ export default function Portfolio() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
 
+  // Массив для хранения нескольких файлов
   const [files, setFiles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ==========================================
+  // СОСТОЯНИЯ FULLSCREEN LIGHTBOX (ПРОСМОТР)
+  // ==========================================
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Категории
   const categoryOptions = [
     { value: "banners", label: "Баннеры" },
     { value: "lightboxes", label: "Лайтбоксы" },
@@ -135,7 +148,6 @@ export default function Portfolio() {
     if (!title || !category || files.length === 0) return;
 
     setIsSubmitting(true);
-
     const formData = new FormData();
     formData.append("title", title);
     formData.append("category", category);
@@ -147,19 +159,17 @@ export default function Portfolio() {
 
     try {
       await apiAddPortfolio(formData);
-
       setTitle("");
       setCategory("");
       setDescription("");
       setFiles([]);
       close();
-
       fetchPortfolio();
     } catch (err) {
       console.error("Ошибка при создании работы:", err);
       alert(
         err.response?.data?.message ||
-          "Ошибка при загрузке работы. Проверьте размер файлов.",
+          "Ошибка при загрузке работы в облако. Возможно, файлы слишком большие.",
       );
     } finally {
       setIsSubmitting(false);
@@ -188,7 +198,7 @@ export default function Portfolio() {
   };
 
   // ==========================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (СЕНЬОР-ХАКИ)
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (ЛАЙТБОКС И ИЗОБРАЖЕНИЯ)
   // ==========================================
   const getCategoryLabel = (val) => {
     const normalizedVal = val?.toLowerCase().replace("_", "-");
@@ -197,29 +207,63 @@ export default function Portfolio() {
   };
 
   const getCoverImage = (item) => {
-    let url = null;
-    if (item.imageUrls && item.imageUrls.length > 0) url = item.imageUrls[0];
-    else if (item.imageUrl) url = item.imageUrl;
-
-    // 🔥 SENIOR CACHE-BUSTER: Взламываем агрессивный кэш мобильных браузеров.
-    // Если телефон запомнил битую ссылку, мы добавляем метку времени к URL.
-    // Телефон подумает, что это абсолютно новый файл и скачает его заново 100%!
-    if (url) {
-      const timestamp = new Date(item.createdAt || Date.now()).getTime();
-      return url.includes("?") ? url : `${url}?t=${timestamp}`;
-    }
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
+    if (item.imageUrl) return item.imageUrl;
     return null;
   };
 
-  const getAllImagesCount = (item) => {
-    if (item.imageUrls && item.imageUrls.length > 0)
-      return item.imageUrls.length;
-    if (item.imageUrl) return 1;
-    return 0;
+  const getAllImages = (item) => {
+    if (!item) return [];
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
+    if (item.imageUrl) return [item.imageUrl];
+    return [];
   };
+
+  const getAllImagesCount = (item) => {
+    return getAllImages(item).length;
+  };
+
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setCurrentImageIndex(0);
+  };
+
+  const closeLightbox = () => {
+    setSelectedItem(null);
+  };
+
+  const lightboxImages = getAllImages(selectedItem);
+
+  const handleNext = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev === lightboxImages.length - 1 ? 0 : prev + 1,
+    );
+  }, [lightboxImages.length]);
+
+  const handlePrev = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? lightboxImages.length - 1 : prev - 1,
+    );
+  }, [lightboxImages.length]);
+
+  // Управление с клавиатуры в лайтбоксе
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!selectedItem) return;
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "Escape") closeLightbox();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedItem, handleNext, handlePrev]);
 
   return (
     <div style={{ fontFamily: '"Google Sans", sans-serif' }}>
+      {/* ========================================== */}
+      {/* ШАПКА СТРАНИЦЫ */}
+      {/* ========================================== */}
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={2} style={{ color: "#1B2E3D" }}>
@@ -268,6 +312,9 @@ export default function Portfolio() {
         </Alert>
       )}
 
+      {/* ========================================== */}
+      {/* ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ */}
+      {/* ========================================== */}
       <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
         <Grid align="flex-end">
           <Grid.Col span={{ base: 12, md: 4 }}>
@@ -311,6 +358,9 @@ export default function Portfolio() {
         </Grid>
       </Paper>
 
+      {/* ========================================== */}
+      {/* СЕТКА ПОРТФОЛИО */}
+      {/* ========================================== */}
       {loading ? (
         <Grid gutter="md">
           {[1, 2, 3, 4].map((i) => (
@@ -323,7 +373,6 @@ export default function Portfolio() {
         <Grid gutter="md">
           {processedItems.map((item) => {
             const imgCount = getAllImagesCount(item);
-            const coverImage = getCoverImage(item);
 
             return (
               <Grid.Col span={{ base: 12, sm: 6, md: 4, lg: 3 }} key={item.id}>
@@ -336,16 +385,36 @@ export default function Portfolio() {
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
+                    cursor: "pointer", // Указываем, что карточка кликабельна
+                    transition: "transform 0.2s ease, box-shadow 0.2s ease",
                   }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.boxShadow =
+                      "0 8px 16px rgba(0,0,0,0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow =
+                      "var(--mantine-shadow-sm)";
+                  }}
+                  onClick={() => handleItemClick(item)} // Открываем лайтбокс при клике
                 >
-                  <Card.Section style={{ position: "relative" }}>
-                    {/* 🔥 Mantine Image с усиленной защитой от сбоев загрузки */}
+                  <Card.Section
+                    style={{ position: "relative", overflow: "hidden" }}
+                  >
                     <Image
-                      src={coverImage}
+                      src={getCoverImage(item)}
                       height={200}
                       alt={item.title}
-                      fallbackSrc="https://placehold.co/600x400?text=Изображение+загружается"
-                      style={{ objectFit: "cover" }}
+                      fallbackSrc="https://placehold.co/600x400?text=Нет+Изображения"
+                      style={{ transition: "transform 0.4s ease" }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform = "scale(1.05)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
                     />
                     <Badge
                       variant="filled"
@@ -358,6 +427,21 @@ export default function Portfolio() {
                     >
                       {getCategoryLabel(item.category)}
                     </Badge>
+
+                    {/* Иконка лупы по центру при наведении (опционально, для красоты) */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 10,
+                        left: 10,
+                        backgroundColor: "rgba(0,0,0,0.5)",
+                        borderRadius: "50%",
+                        padding: "6px",
+                        display: "flex",
+                      }}
+                    >
+                      <IconZoomIn color="white" size={16} />
+                    </div>
 
                     {imgCount > 1 && (
                       <Badge
@@ -399,7 +483,10 @@ export default function Portfolio() {
                     mt="md"
                     radius="md"
                     leftSection={<IconTrash size={16} />}
-                    onClick={() => handleDelete(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // ВАЖНО: останавливаем клик, чтобы не открылся лайтбокс
+                      handleDelete(item.id);
+                    }}
                   >
                     Удалить
                   </Button>
@@ -445,6 +532,9 @@ export default function Portfolio() {
         </Paper>
       )}
 
+      {/* ========================================== */}
+      {/* МОДАЛЬНОЕ ОКНО СОЗДАНИЯ РАБОТЫ */}
+      {/* ========================================== */}
       <Modal
         opened={opened}
         onClose={close}
@@ -479,12 +569,12 @@ export default function Portfolio() {
             />
 
             <FileInput
-              label="Фотографии работы (до 10 шт)"
-              placeholder="Нажмите, чтобы выбрать файлы"
+              label="Фотографии работы (можно выбрать несколько)"
+              placeholder="Нажмите, чтобы выбрать файлы (до 10 шт)"
               required
               multiple
               clearable
-              accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
+              accept="image/png,image/jpeg,image/webp"
               leftSection={<IconUpload size={16} />}
               value={files}
               onChange={setFiles}
@@ -514,6 +604,159 @@ export default function Portfolio() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      {/* ========================================== */}
+      {/* FULLSCREEN LIGHTBOX (ПРОСМОТР ФОТО) */}
+      {/* ========================================== */}
+      <Modal
+        opened={!!selectedItem}
+        onClose={closeLightbox}
+        fullScreen
+        withCloseButton={false}
+        transitionProps={{ transition: "fade", duration: 250 }}
+        styles={{
+          inner: { padding: 0 },
+          content: { backgroundColor: "#0f0f0f", color: "white" },
+          body: {
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            padding: 0,
+          },
+        }}
+      >
+        {selectedItem && (
+          <>
+            {/* ВЕРХНЯЯ ПАНЕЛЬ: Заголовок и закрытие */}
+            <Group
+              justify="space-between"
+              align="flex-start"
+              p="md"
+              style={{ flexShrink: 0 }}
+            >
+              <Box style={{ maxWidth: "80%" }}>
+                <Title order={3} style={{ color: "white" }} lineClamp={1}>
+                  {selectedItem.title}
+                </Title>
+                <Text size="sm" style={{ color: "rgba(255,255,255,0.7)" }}>
+                  {getCategoryLabel(selectedItem.category)}
+                </Text>
+              </Box>
+              <ActionIcon
+                onClick={closeLightbox}
+                size="xl"
+                variant="transparent"
+                style={{ color: "white" }}
+              >
+                <IconX size={32} />
+              </ActionIcon>
+            </Group>
+
+            {/* ЦЕНТРАЛЬНАЯ ЗОНА: Основное фото и стрелки */}
+            <Box
+              style={{
+                flexGrow: 1,
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                padding: "0 16px",
+              }}
+            >
+              {lightboxImages.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrev();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronLeft size={40} />
+                </ActionIcon>
+              )}
+
+              <Image
+                src={lightboxImages[currentImageIndex]}
+                alt={selectedItem.title}
+                fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
+                style={{
+                  maxHeight: "80vh",
+                  maxWidth: "100%",
+                  objectFit: "contain",
+                  transition: "opacity 0.2s ease",
+                }}
+              />
+
+              {lightboxImages.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNext();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronRight size={40} />
+                </ActionIcon>
+              )}
+            </Box>
+
+            {/* НИЖНЯЯ ПАНЕЛЬ: Миниатюры (показываем, если картинок больше 1) */}
+            {lightboxImages.length > 1 && (
+              <Box
+                style={{
+                  flexShrink: 0,
+                  padding: "16px",
+                  overflowX: "auto",
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <Group gap="sm" style={{ flexWrap: "nowrap" }}>
+                  {lightboxImages.map((imgUrl, idx) => (
+                    <Image
+                      key={idx}
+                      src={imgUrl}
+                      w={60}
+                      h={60}
+                      radius="md"
+                      onClick={() => setCurrentImageIndex(idx)}
+                      style={{
+                        objectFit: "cover",
+                        cursor: "pointer",
+                        border:
+                          currentImageIndex === idx
+                            ? "2px solid #FF8C00"
+                            : "2px solid transparent",
+                        opacity: currentImageIndex === idx ? 1 : 0.5,
+                        transition: "all 0.2s ease",
+                      }}
+                    />
+                  ))}
+                </Group>
+              </Box>
+            )}
+          </>
+        )}
       </Modal>
     </div>
   );
