@@ -38,7 +38,6 @@ import {
   IconShoppingCart,
 } from "@tabler/icons-react";
 
-// 🔥 Senior Update: Импортируем базовый API и методы из axios.js
 import api, {
   fetchOrders as apiFetchOrders,
   updateOrder as apiUpdateOrder,
@@ -69,7 +68,7 @@ export default function Orders() {
   const [newOrder, setNewOrder] = useState({
     customerName: "",
     phone: "",
-    serviceType: "BANNERS", // Базовое значение Enum для Prisma
+    serviceType: "BANNERS",
     description: "",
     totalPrice: 0,
   });
@@ -82,11 +81,11 @@ export default function Orders() {
   const [editingOrder, setEditingOrder] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Поля управления заказом (статус и финансы)
+  // Поля управления заказом
   const [status, setStatus] = useState("NEW");
   const [price, setPrice] = useState(0);
 
-  // Поля для расходов по заказу (себестоимость)
+  // Поля для расходов по заказу
   const [orderExpenses, setOrderExpenses] = useState([]);
   const [expenseCategory, setExpenseCategory] = useState(
     "Материалы (Акрил, ПВХ, Пленка)",
@@ -95,7 +94,7 @@ export default function Orders() {
   const [expenseComment, setExpenseComment] = useState("");
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ЗАКАЗОВ (REAL DATA)
+  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ЗАКАЗОВ
   // ==========================================
   const fetchOrders = async () => {
     try {
@@ -123,19 +122,14 @@ export default function Orders() {
   // ==========================================
   const processedOrders = [...orders]
     .filter((order) => {
-      // 1. Поиск по тексту (Имя клиента, ID, Описание/Источник)
       const searchString =
         `${order.customerName || order.clientName || ""} ${order.id || ""} ${order.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchTerm.toLowerCase());
-
-      // 2. Фильтр по статусу
       const matchesStatus =
         filterStatus === "ALL" ? true : order.status === filterStatus;
-
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
-      // 3. Сортировка
       if (sortBy === "DATE_DESC")
         return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       if (sortBy === "DATE_ASC")
@@ -148,7 +142,7 @@ export default function Orders() {
     });
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: СОЗДАНИЕ НОВОГО ЗАКАЗА (РУЧНОЙ ВВОД)
+  // БИЗНЕС-ЛОГИКА: СОЗДАНИЕ НОВОГО ЗАКАЗА
   // ==========================================
   const handleCreateOrder = async (e) => {
     e.preventDefault();
@@ -156,21 +150,19 @@ export default function Orders() {
 
     setIsCreating(true);
     try {
-      // Отправляем данные на сервер
       await api.post("/orders", {
         customerName: newOrder.customerName,
         phone: newOrder.phone,
         serviceType: newOrder.serviceType,
         description:
           newOrder.description || "Создано вручную менеджером Royal Banners",
-        price: newOrder.totalPrice, // Для совместимости с разными версиями API
+        price: newOrder.totalPrice,
         totalPrice: newOrder.totalPrice,
         status: "NEW",
         hasEyelets: false,
         needsMount: true,
       });
 
-      // Очищаем форму и закрываем
       setNewOrder({
         customerName: "",
         phone: "",
@@ -179,8 +171,6 @@ export default function Orders() {
         totalPrice: 0,
       });
       closeCreate();
-
-      // Обновляем таблицу
       fetchOrders();
     } catch (err) {
       console.error("Ошибка при создании заявки:", err);
@@ -202,7 +192,6 @@ export default function Orders() {
     setPrice(order.price || order.totalPrice || 0);
     setOrderExpenses(order.expenses || []);
 
-    // Сбрасываем форму добавления расхода
     setExpenseCategory("Материалы (Акрил, ПВХ, Пленка)");
     setExpenseAmount(0);
     setExpenseComment("");
@@ -215,17 +204,13 @@ export default function Orders() {
   // ==========================================
   const handleAddExpense = () => {
     if (expenseAmount <= 0) return;
-
     const newExpense = {
-      id: Date.now(), // Временный ID для фронтенда
+      id: Date.now(),
       category: expenseCategory,
       amount: expenseAmount,
       comment: expenseComment || "Без комментария",
     };
-
     setOrderExpenses([...orderExpenses, newExpense]);
-
-    // Очищаем инпуты после добавления
     setExpenseAmount(0);
     setExpenseComment("");
   };
@@ -234,7 +219,6 @@ export default function Orders() {
     setOrderExpenses(orderExpenses.filter((e) => e.id !== expenseId));
   };
 
-  // Расчет итогов для модалки редактирования
   const totalExpenses = orderExpenses.reduce(
     (sum, item) => sum + item.amount,
     0,
@@ -242,7 +226,7 @@ export default function Orders() {
   const netProfit = price - totalExpenses;
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ ИЗМЕНЕНИЙ (REAL DATA)
+  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ ИЗМЕНЕНИЙ
   // ==========================================
   const handleUpdateOrder = async (e) => {
     e.preventDefault();
@@ -253,10 +237,9 @@ export default function Orders() {
       await apiUpdateOrder(editingOrder.id, {
         status,
         price,
-        totalPrice: price, // Дублируем для обратной совместимости
+        totalPrice: price,
         expenses: orderExpenses,
       });
-
       closeEdit();
       fetchOrders();
     } catch (err) {
@@ -271,7 +254,7 @@ export default function Orders() {
   };
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ ЗАКАЗА (REAL DATA)
+  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ ЗАКАЗА
   // ==========================================
   const handleDeleteOrder = async (id) => {
     if (
@@ -358,11 +341,6 @@ export default function Orders() {
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={2} style={{ color: "#1B2E3D" }}>
-            <IconShoppingCart
-              size={26}
-              color="#FF8C00"
-              style={{ verticalAlign: "bottom", marginRight: "8px" }}
-            />
             Управление заказами
           </Title>
           <Text c="dimmed" mt={5}>
@@ -458,7 +436,7 @@ export default function Orders() {
       </Paper>
 
       {/* ========================================== */}
-      {/* ОСНОВНАЯ ТАБЛИЦА ЗАКАЗОВ */}
+      {/* ОСНОВНОЙ ВЫВОД ДАННЫХ (ТАБЛИЦА / КАРТОЧКИ) */}
       {/* ========================================== */}
       <Paper
         withBorder
@@ -474,90 +452,184 @@ export default function Orders() {
             <Skeleton height={40} />
           </div>
         ) : processedOrders.length > 0 ? (
-          <Box style={{ overflowX: "auto" }}>
-            <Table
-              striped
-              highlightOnHover
-              verticalSpacing="md"
-              horizontalSpacing="lg"
-              style={{ minWidth: 1000 }}
-            >
-              <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-                <Table.Tr>
-                  <Table.Th style={{ color: "#1B2E3D" }}>ID / Дата</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Клиент</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>ТЗ / Описание</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Статус</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Смета</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                    Действия
-                  </Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {processedOrders.map((order) => (
-                  <Table.Tr key={order.id}>
-                    <Table.Td>
-                      <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
-                        {order.id.slice(0, 8).toUpperCase()}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {formatDate(order.createdAt)}
-                      </Text>
-                    </Table.Td>
+          <>
+            {/* 🔥 ДЕСКТОПНАЯ ВЕРСИЯ: ТАБЛИЦА (Скрывается на мобильных) */}
+            <Box visibleFrom="md" style={{ overflowX: "auto" }}>
+              <Table
+                striped
+                highlightOnHover
+                verticalSpacing="md"
+                horizontalSpacing="lg"
+                style={{ minWidth: 1000 }}
+              >
+                <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                  <Table.Tr>
+                    <Table.Th style={{ color: "#1B2E3D" }}>ID / Дата</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>Клиент</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>
+                      ТЗ / Описание
+                    </Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>Статус</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>Смета</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                      Действия
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {processedOrders.map((order) => (
+                    <Table.Tr key={order.id}>
+                      <Table.Td>
+                        <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
+                          {order.id.slice(0, 8).toUpperCase()}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {formatDate(order.createdAt)}
+                        </Text>
+                      </Table.Td>
 
-                    <Table.Td>
-                      <Text fw={500} size="sm" style={{ color: "#1B2E3D" }}>
+                      <Table.Td>
+                        <Text fw={500} size="sm" style={{ color: "#1B2E3D" }}>
+                          {order.customerName ||
+                            order.clientName ||
+                            "Без имени"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {order.phone || order.clientPhone || "Нет телефона"}
+                        </Text>
+                      </Table.Td>
+
+                      <Table.Td>
+                        <Text size="sm" lineClamp={2} maw={280}>
+                          {order.description || "Нет описания"}
+                        </Text>
+                      </Table.Td>
+
+                      <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
+
+                      <Table.Td>
+                        <Text fw={700} size="sm" style={{ color: "#1B2E3D" }}>
+                          {order.price || order.totalPrice
+                            ? `${(order.price || order.totalPrice).toLocaleString("ru-RU")} ₸`
+                            : "Смета не готова"}
+                        </Text>
+                      </Table.Td>
+
+                      <Table.Td style={{ textAlign: "right" }}>
+                        <Group gap="xs" justify="flex-end">
+                          <Tooltip label="Управление финансами и статусом">
+                            <ActionIcon
+                              variant="light"
+                              color="blue"
+                              onClick={() => handleEditClick(order)}
+                            >
+                              <IconEdit size={16} stroke={1.5} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Удалить заказ">
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              onClick={() => handleDeleteOrder(order.id)}
+                            >
+                              <IconTrash size={16} stroke={1.5} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+
+            {/* 🔥 МОБИЛЬНАЯ ВЕРСИЯ: КАРТОЧКИ (Показывается только на смартфонах) */}
+            <Box hiddenFrom="md" bg="#f8f9fa" p="md">
+              <Stack gap="md">
+                {processedOrders.map((order) => (
+                  <Paper
+                    key={order.id}
+                    withBorder
+                    shadow="sm"
+                    p="md"
+                    radius="md"
+                  >
+                    <Group justify="space-between" align="flex-start" mb="xs">
+                      <Box>
+                        <Text fw={700} size="md" style={{ color: "#1B2E3D" }}>
+                          #{order.id.slice(0, 8).toUpperCase()}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {formatDate(order.createdAt)}
+                        </Text>
+                      </Box>
+                      {renderStatusBadge(order.status)}
+                    </Group>
+
+                    <Divider my="sm" />
+
+                    <Box mb="xs">
+                      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                        Клиент
+                      </Text>
+                      <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
                         {order.customerName || order.clientName || "Без имени"}
                       </Text>
-                      <Text size="xs" c="dimmed">
+                      <Text
+                        size="xs"
+                        c="blue"
+                        component="a"
+                        href={`tel:${order.phone || order.clientPhone}`}
+                      >
                         {order.phone || order.clientPhone || "Нет телефона"}
                       </Text>
-                    </Table.Td>
+                    </Box>
 
-                    <Table.Td>
-                      <Text size="sm" lineClamp={2} maw={280}>
+                    <Box mb="sm">
+                      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                        ТЗ / Описание
+                      </Text>
+                      <Text size="sm" lineClamp={3}>
                         {order.description || "Нет описания"}
                       </Text>
-                    </Table.Td>
+                    </Box>
 
-                    <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
+                    <Group justify="space-between" align="flex-end" mt="md">
+                      <Box>
+                        <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                          Смета
+                        </Text>
+                        <Text fw={800} size="lg" style={{ color: "#1B2E3D" }}>
+                          {order.price || order.totalPrice
+                            ? `${(order.price || order.totalPrice).toLocaleString("ru-RU")} ₸`
+                            : "Не готова"}
+                        </Text>
+                      </Box>
 
-                    <Table.Td>
-                      <Text fw={700} size="sm" style={{ color: "#1B2E3D" }}>
-                        {order.price || order.totalPrice
-                          ? `${(order.price || order.totalPrice).toLocaleString("ru-RU")} ₸`
-                          : "Смета не готова"}
-                      </Text>
-                    </Table.Td>
-
-                    <Table.Td style={{ textAlign: "right" }}>
-                      <Group gap="xs" justify="flex-end">
-                        <Tooltip label="Управление финансами и статусом">
-                          <ActionIcon
-                            variant="light"
-                            color="blue"
-                            onClick={() => handleEditClick(order)}
-                          >
-                            <IconEdit size={16} stroke={1.5} />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Удалить заказ">
-                          <ActionIcon
-                            variant="light"
-                            color="red"
-                            onClick={() => handleDeleteOrder(order.id)}
-                          >
-                            <IconTrash size={16} stroke={1.5} />
-                          </ActionIcon>
-                        </Tooltip>
+                      <Group gap="xs">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          size="lg"
+                          onClick={() => handleEditClick(order)}
+                        >
+                          <IconEdit size={18} stroke={1.5} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          size="lg"
+                          onClick={() => handleDeleteOrder(order.id)}
+                        >
+                          <IconTrash size={18} stroke={1.5} />
+                        </ActionIcon>
                       </Group>
-                    </Table.Td>
-                  </Table.Tr>
+                    </Group>
+                  </Paper>
                 ))}
-              </Table.Tbody>
-            </Table>
-          </Box>
+              </Stack>
+            </Box>
+          </>
         ) : (
           <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
             <Text size="lg" fw={500} style={{ color: "#1B2E3D" }}>
@@ -588,7 +660,8 @@ export default function Orders() {
         <form onSubmit={handleCreateOrder}>
           <Stack gap="md">
             <Grid>
-              <Grid.Col span={6}>
+              {/* 🔥 SENIOR FIX: Адаптивные инпут-поля (схлопываются на телефоне) */}
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <TextInput
                   label="Имя клиента / Компания"
                   placeholder="Иван Иванов"
@@ -602,7 +675,7 @@ export default function Orders() {
                   }
                 />
               </Grid.Col>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <TextInput
                   label="Телефон"
                   placeholder="+7 (777) 000-00-00"
@@ -690,7 +763,8 @@ export default function Orders() {
               {/* БЛОК 1: ИНФОРМАЦИЯ */}
               <Paper p="md" radius="md" bg="#f8f9fa" withBorder>
                 <Grid>
-                  <Grid.Col span={6}>
+                  {/* 🔥 SENIOR FIX: Адаптивность инфо-блока */}
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
                     <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
                       Заказчик
                     </Text>
@@ -703,7 +777,7 @@ export default function Orders() {
                       {editingOrder.phone || editingOrder.clientPhone}
                     </Text>
                   </Grid.Col>
-                  <Grid.Col span={6}>
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
                     <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
                       Описание / ТЗ
                     </Text>
@@ -718,7 +792,7 @@ export default function Orders() {
 
               {/* БЛОК 2: СТАТУС И ВЫРУЧКА */}
               <Grid>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Select
                     label="Статус выполнения"
                     data={[
@@ -738,7 +812,7 @@ export default function Orders() {
                     styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <NumberInput
                     label="Итоговая выручка (₸)"
                     description="Утвержденная смета для клиента"
@@ -769,7 +843,7 @@ export default function Orders() {
               {/* БЛОК 3: ДОБАВЛЕНИЕ РАСХОДОВ */}
               <Paper p="md" radius="md" withBorder bg="white">
                 <Grid align="flex-end">
-                  <Grid.Col span={3}>
+                  <Grid.Col span={{ base: 12, sm: 3 }}>
                     <Select
                       label="Категория"
                       data={[
@@ -783,7 +857,7 @@ export default function Orders() {
                       onChange={setExpenseCategory}
                     />
                   </Grid.Col>
-                  <Grid.Col span={3}>
+                  <Grid.Col span={{ base: 12, sm: 3 }}>
                     <NumberInput
                       label="Сумма (₸)"
                       min={0}
@@ -792,7 +866,7 @@ export default function Orders() {
                       onChange={setExpenseAmount}
                     />
                   </Grid.Col>
-                  <Grid.Col span={4}>
+                  <Grid.Col span={{ base: 12, sm: 4 }}>
                     <TextInput
                       label="Комментарий"
                       placeholder="Например: Покупка диодов"
@@ -800,7 +874,7 @@ export default function Orders() {
                       onChange={(e) => setExpenseComment(e.currentTarget.value)}
                     />
                   </Grid.Col>
-                  <Grid.Col span={2}>
+                  <Grid.Col span={{ base: 12, sm: 2 }}>
                     <Button
                       fullWidth
                       variant="light"
@@ -813,38 +887,80 @@ export default function Orders() {
                   </Grid.Col>
                 </Grid>
 
-                {/* СПИСОК ДОБАВЛЕННЫХ РАСХОДОВ */}
+                {/* СПИСОК ДОБАВЛЕННЫХ РАСХОДОВ (ТАБЛИЦА / КАРТОЧКИ) */}
                 {orderExpenses.length > 0 && (
-                  <Table mt="md" verticalSpacing="sm" striped>
-                    <Table.Tbody>
-                      {orderExpenses.map((exp) => (
-                        <Table.Tr key={exp.id}>
-                          <Table.Td w={150}>
-                            <Badge color="gray" variant="light">
-                              {exp.category}
-                            </Badge>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm">{exp.comment}</Text>
-                          </Table.Td>
-                          <Table.Td ta="right">
-                            <Text fw={600} color="red">
-                              -{exp.amount.toLocaleString("ru-RU")} ₸
-                            </Text>
-                          </Table.Td>
-                          <Table.Td w={50} ta="right">
-                            <ActionIcon
-                              color="red"
-                              variant="subtle"
-                              onClick={() => handleRemoveExpense(exp.id)}
+                  <>
+                    {/* ДЕСКТОП: ТАБЛИЦА РАСХОДОВ */}
+                    <Box visibleFrom="sm">
+                      <Table mt="md" verticalSpacing="sm" striped>
+                        <Table.Tbody>
+                          {orderExpenses.map((exp) => (
+                            <Table.Tr key={exp.id}>
+                              <Table.Td w={150}>
+                                <Badge color="gray" variant="light">
+                                  {exp.category}
+                                </Badge>
+                              </Table.Td>
+                              <Table.Td>
+                                <Text size="sm">{exp.comment}</Text>
+                              </Table.Td>
+                              <Table.Td ta="right">
+                                <Text fw={600} color="red">
+                                  -{exp.amount.toLocaleString("ru-RU")} ₸
+                                </Text>
+                              </Table.Td>
+                              <Table.Td w={50} ta="right">
+                                <ActionIcon
+                                  color="red"
+                                  variant="subtle"
+                                  onClick={() => handleRemoveExpense(exp.id)}
+                                >
+                                  <IconTrash size={16} />
+                                </ActionIcon>
+                              </Table.Td>
+                            </Table.Tr>
+                          ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Box>
+
+                    {/* МОБИЛКА: КАРТОЧКИ РАСХОДОВ */}
+                    <Box hiddenFrom="sm" mt="md">
+                      <Stack gap="xs">
+                        {orderExpenses.map((exp) => (
+                          <Paper key={exp.id} withBorder p="sm" radius="md">
+                            <Group
+                              justify="space-between"
+                              align="flex-start"
+                              wrap="nowrap"
                             >
-                              <IconTrash size={16} />
-                            </ActionIcon>
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
+                              <Box>
+                                <Badge color="gray" variant="light" mb={5}>
+                                  {exp.category}
+                                </Badge>
+                                <Text size="sm" lineClamp={2}>
+                                  {exp.comment}
+                                </Text>
+                              </Box>
+                              <Stack align="flex-end" gap={5}>
+                                <Text fw={600} color="red">
+                                  -{exp.amount.toLocaleString("ru-RU")} ₸
+                                </Text>
+                                <ActionIcon
+                                  color="red"
+                                  variant="subtle"
+                                  size="sm"
+                                  onClick={() => handleRemoveExpense(exp.id)}
+                                >
+                                  <IconTrash size={14} />
+                                </ActionIcon>
+                              </Stack>
+                            </Group>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    </Box>
+                  </>
                 )}
               </Paper>
 

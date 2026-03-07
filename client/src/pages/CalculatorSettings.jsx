@@ -96,7 +96,7 @@ export default function CalculatorSettings() {
       }
     } catch (err) {
       console.error("Ошибка загрузки настроек:", err);
-      // 🔥 Senior Practice: Никаких фейковых данных! Если сервер недоступен, ставим пустой массив
+      // Никаких фейковых данных! Если сервер недоступен, ставим пустой массив
       setConfigs([]);
       setError(
         "Не удалось загрузить настройки калькулятора. Проверьте соединение с сервером.",
@@ -269,7 +269,7 @@ export default function CalculatorSettings() {
   const handleDuplicateConfig = (config) => {
     const duplicatedConfig = {
       ...config,
-      id: `config_${Date.now()}`, // Создаем новый уникальный ID
+      id: `config_${Date.now()}`,
       title: `${config.title} (Копия)`,
     };
     setConfigs([...configs, duplicatedConfig]);
@@ -285,7 +285,6 @@ export default function CalculatorSettings() {
       alert("Сложная архитектура калькулятора успешно сохранена!");
     } catch (err) {
       console.error("Ошибка сохранения:", err);
-      // 🔥 Senior Update: Показываем реальную ошибку с сервера
       alert(
         err.response?.data?.message ||
           "Не удалось сохранить настройки калькулятора. Проверьте соединение с сервером.",
@@ -308,7 +307,6 @@ export default function CalculatorSettings() {
       <Group justify="space-between" mb="xl">
         <div>
           <Group gap="xs" mb="xs">
-            <IconCalculator size={28} color="#1B2E3D" stroke={1.5} />
             <Title order={2} style={{ color: "#1B2E3D" }}>
               Архитектура Калькулятора
             </Title>
@@ -484,7 +482,7 @@ export default function CalculatorSettings() {
 
                 {/* СОДЕРЖИМОЕ АККОРДЕОНА (НАСТРОЙКИ) */}
                 <Accordion.Panel>
-                  <Stack gap="xl" p="md">
+                  <Stack gap="xl" p={{ base: "xs", sm: "md" }}>
                     {/* ОСНОВНЫЕ НАСТРОЙКИ */}
                     <Paper p="md" withBorder radius="md" bg="#f8f9fa">
                       <Title order={5} mb="md" style={{ color: "#1B2E3D" }}>
@@ -640,7 +638,7 @@ export default function CalculatorSettings() {
                       )}
                     </Paper>
 
-                    {/* ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ (ЧЕКБОКСЫ) */}
+                    {/* ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ (ADD-ONS) */}
                     <Paper
                       p="md"
                       withBorder
@@ -673,84 +671,161 @@ export default function CalculatorSettings() {
                           Дополнительные опции не настроены.
                         </Text>
                       ) : (
-                        <Table striped highlightOnHover>
-                          <Table.Thead>
-                            <Table.Tr>
-                              <Table.Th>Название опции</Table.Th>
-                              <Table.Th>Тип наценки</Table.Th>
-                              <Table.Th>Значение (₸ / %)</Table.Th>
-                              <Table.Th w={50}></Table.Th>
-                            </Table.Tr>
-                          </Table.Thead>
-                          <Table.Tbody>
-                            {config.addons.map((addon) => (
-                              <Table.Tr key={addon.id}>
-                                <Table.Td>
-                                  <TextInput
-                                    placeholder="Название (напр. Срочность)"
-                                    value={addon.name}
-                                    onChange={(e) =>
-                                      updateAddon(
-                                        config.id,
-                                        addon.id,
-                                        "name",
-                                        e.currentTarget.value,
-                                      )
-                                    }
-                                  />
-                                </Table.Td>
-                                <Table.Td>
-                                  <Select
-                                    data={[
-                                      {
-                                        value: "fixed",
-                                        label: "Фиксированная сумма (₸)",
-                                      },
-                                      {
-                                        value: "percent",
-                                        label: "Процент от итога (%)",
-                                      },
-                                    ]}
-                                    value={addon.type}
-                                    onChange={(val) =>
-                                      updateAddon(
-                                        config.id,
-                                        addon.id,
-                                        "type",
-                                        val,
-                                      )
-                                    }
-                                  />
-                                </Table.Td>
-                                <Table.Td>
-                                  <NumberInput
-                                    value={addon.value}
-                                    onChange={(val) =>
-                                      updateAddon(
-                                        config.id,
-                                        addon.id,
-                                        "value",
-                                        val,
-                                      )
-                                    }
-                                    min={0}
-                                  />
-                                </Table.Td>
-                                <Table.Td>
-                                  <ActionIcon
-                                    color="red"
-                                    variant="subtle"
-                                    onClick={() =>
-                                      handleRemoveAddon(config.id, addon.id)
-                                    }
-                                  >
-                                    <IconTrash size={16} />
-                                  </ActionIcon>
-                                </Table.Td>
-                              </Table.Tr>
-                            ))}
-                          </Table.Tbody>
-                        </Table>
+                        <>
+                          {/* 🔥 ДЕСКТОП: ТАБЛИЦА */}
+                          <Box visibleFrom="sm" style={{ overflowX: "auto" }}>
+                            <Table striped highlightOnHover>
+                              <Table.Thead>
+                                <Table.Tr>
+                                  <Table.Th>Название опции</Table.Th>
+                                  <Table.Th>Тип наценки</Table.Th>
+                                  <Table.Th>Значение (₸ / %)</Table.Th>
+                                  <Table.Th w={50}></Table.Th>
+                                </Table.Tr>
+                              </Table.Thead>
+                              <Table.Tbody>
+                                {config.addons.map((addon) => (
+                                  <Table.Tr key={addon.id}>
+                                    <Table.Td>
+                                      <TextInput
+                                        placeholder="Название (напр. Срочность)"
+                                        value={addon.name}
+                                        onChange={(e) =>
+                                          updateAddon(
+                                            config.id,
+                                            addon.id,
+                                            "name",
+                                            e.currentTarget.value,
+                                          )
+                                        }
+                                      />
+                                    </Table.Td>
+                                    <Table.Td>
+                                      <Select
+                                        data={[
+                                          {
+                                            value: "fixed",
+                                            label: "Фиксированная сумма (₸)",
+                                          },
+                                          {
+                                            value: "percent",
+                                            label: "Процент от итога (%)",
+                                          },
+                                        ]}
+                                        value={addon.type}
+                                        onChange={(val) =>
+                                          updateAddon(
+                                            config.id,
+                                            addon.id,
+                                            "type",
+                                            val,
+                                          )
+                                        }
+                                      />
+                                    </Table.Td>
+                                    <Table.Td>
+                                      <NumberInput
+                                        value={addon.value}
+                                        onChange={(val) =>
+                                          updateAddon(
+                                            config.id,
+                                            addon.id,
+                                            "value",
+                                            val,
+                                          )
+                                        }
+                                        min={0}
+                                      />
+                                    </Table.Td>
+                                    <Table.Td>
+                                      <ActionIcon
+                                        color="red"
+                                        variant="subtle"
+                                        onClick={() =>
+                                          handleRemoveAddon(config.id, addon.id)
+                                        }
+                                      >
+                                        <IconTrash size={16} />
+                                      </ActionIcon>
+                                    </Table.Td>
+                                  </Table.Tr>
+                                ))}
+                              </Table.Tbody>
+                            </Table>
+                          </Box>
+
+                          {/* 🔥 МОБИЛЬНАЯ ВЕРСИЯ: КАРТОЧКИ */}
+                          <Box hiddenFrom="sm">
+                            <Stack gap="sm">
+                              {config.addons.map((addon) => (
+                                <Paper key={addon.id} withBorder p="md" radius="sm" bg="#f8f9fa">
+                                  <Stack gap="xs">
+                                    <TextInput
+                                      label="Название опции"
+                                      placeholder="Напр. Срочность"
+                                      value={addon.name}
+                                      onChange={(e) =>
+                                        updateAddon(
+                                          config.id,
+                                          addon.id,
+                                          "name",
+                                          e.currentTarget.value,
+                                        )
+                                      }
+                                    />
+                                    <Select
+                                      label="Тип наценки"
+                                      data={[
+                                        {
+                                          value: "fixed",
+                                          label: "Фиксированная сумма (₸)",
+                                        },
+                                        {
+                                          value: "percent",
+                                          label: "Процент от итога (%)",
+                                        },
+                                      ]}
+                                      value={addon.type}
+                                      onChange={(val) =>
+                                        updateAddon(
+                                          config.id,
+                                          addon.id,
+                                          "type",
+                                          val,
+                                        )
+                                      }
+                                    />
+                                    <NumberInput
+                                      label="Значение"
+                                      value={addon.value}
+                                      onChange={(val) =>
+                                        updateAddon(
+                                          config.id,
+                                          addon.id,
+                                          "value",
+                                          val,
+                                        )
+                                      }
+                                      min={0}
+                                    />
+                                    <Button
+                                      mt="sm"
+                                      color="red"
+                                      variant="light"
+                                      fullWidth
+                                      leftSection={<IconTrash size={16} />}
+                                      onClick={() =>
+                                        handleRemoveAddon(config.id, addon.id)
+                                      }
+                                    >
+                                      Удалить опцию
+                                    </Button>
+                                  </Stack>
+                                </Paper>
+                              ))}
+                            </Stack>
+                          </Box>
+                        </>
                       )}
                     </Paper>
                   </Stack>

@@ -102,7 +102,7 @@ export default function Dashboard() {
       // Используем функцию из axios.js
       const response = await fetchDashboardStats(params);
 
-      // 🔥 Senior Fix: Проверяем и success, и status, так как API может отдавать разные форматы
+      // Проверяем и success, и status, так как API может отдавать разные форматы
       if (response.data && (response.data.success || response.data.status === 'success')) {
         const data = response.data.data;
 
@@ -130,7 +130,7 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error("Критическая ошибка при получении аналитики:", err);
-      // 🔥 Senior Practice: Никаких фейковых данных! Если сервер недоступен, ставим 0.
+      // Никаких фейковых данных! Если сервер недоступен, ставим 0.
       setStats({
         totalOrders: 0,
         totalRevenue: 0,
@@ -491,7 +491,7 @@ export default function Dashboard() {
             radius="md"
             p={0}
             shadow="sm"
-            style={{ overflow: "hidden" }}
+            style={{ overflow: "hidden", backgroundColor: "white" }}
           >
             {loading ? (
               <Box p="md">
@@ -500,46 +500,79 @@ export default function Dashboard() {
                 <Skeleton height={40} />
               </Box>
             ) : stats.recentOrders.length > 0 ? (
-              <Box style={{ overflowX: "auto" }}>
-                <Table
-                  striped
-                  highlightOnHover
-                  verticalSpacing="md"
-                  horizontalSpacing="md"
-                  style={{ minWidth: 600 }}
-                >
-                  <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-                    <Table.Tr>
-                      <Table.Th>Дата</Table.Th>
-                      <Table.Th>Клиент</Table.Th>
-                      <Table.Th>Статус</Table.Th>
-                      <Table.Th ta="right">Сумма</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {stats.recentOrders.map((order) => (
-                      <Table.Tr key={order.id}>
-                        <Table.Td c="dimmed" fz="sm">
-                          {formatDate(order.createdAt || order.date)}
-                        </Table.Td>
-                        <Table.Td fw={500} style={{ color: "#1B2E3D" }}>
-                          {order.customerName || order.clientName || "Без имени"}
-                        </Table.Td>
-                        <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
-                        <Table.Td
-                          ta="right"
-                          fw={600}
-                          style={{ color: "#1B2E3D" }}
-                        >
-                          {order.totalPrice || order.price
-                            ? `${(order.totalPrice || order.price).toLocaleString("ru-RU")} ₸`
-                            : "-"}
-                        </Table.Td>
+              <>
+                {/* 🔥 ДЕСКТОПНАЯ ВЕРСИЯ: ТАБЛИЦА (Скрывается на мобильных) */}
+                <Box visibleFrom="sm" style={{ overflowX: "auto" }}>
+                  <Table
+                    striped
+                    highlightOnHover
+                    verticalSpacing="md"
+                    horizontalSpacing="md"
+                    style={{ minWidth: 600 }}
+                  >
+                    <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                      <Table.Tr>
+                        <Table.Th>Дата</Table.Th>
+                        <Table.Th>Клиент</Table.Th>
+                        <Table.Th>Статус</Table.Th>
+                        <Table.Th ta="right">Сумма</Table.Th>
                       </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {stats.recentOrders.map((order) => (
+                        <Table.Tr key={order.id}>
+                          <Table.Td c="dimmed" fz="sm">
+                            {formatDate(order.createdAt || order.date)}
+                          </Table.Td>
+                          <Table.Td fw={500} style={{ color: "#1B2E3D" }}>
+                            {order.customerName || order.clientName || "Без имени"}
+                          </Table.Td>
+                          <Table.Td>{renderStatusBadge(order.status)}</Table.Td>
+                          <Table.Td
+                            ta="right"
+                            fw={600}
+                            style={{ color: "#1B2E3D" }}
+                          >
+                            {order.totalPrice || order.price
+                              ? `${(order.totalPrice || order.price).toLocaleString("ru-RU")} ₸`
+                              : "-"}
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Box>
+
+                {/* 🔥 МОБИЛЬНАЯ ВЕРСИЯ: КАРТОЧКИ (Показывается только на смартфонах) */}
+                <Box hiddenFrom="sm" p="md" bg="#f8f9fa">
+                  <Stack gap="sm">
+                    {stats.recentOrders.map((order) => (
+                      <Paper key={order.id} withBorder p="md" radius="md" shadow="sm">
+                        <Group justify="space-between" mb="xs">
+                          <Text size="xs" c="dimmed">
+                            {formatDate(order.createdAt || order.date)}
+                          </Text>
+                          {renderStatusBadge(order.status)}
+                        </Group>
+                        <Divider my="xs" />
+                        <Text fw={600} size="sm" mb="xs" style={{ color: "#1B2E3D" }}>
+                          {order.customerName || order.clientName || "Без имени"}
+                        </Text>
+                        <Group justify="space-between">
+                          <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                            Сумма
+                          </Text>
+                          <Text fw={700} style={{ color: "#1B2E3D" }}>
+                            {order.totalPrice || order.price
+                              ? `${(order.totalPrice || order.price).toLocaleString("ru-RU")} ₸`
+                              : "-"}
+                          </Text>
+                        </Group>
+                      </Paper>
                     ))}
-                  </Table.Tbody>
-                </Table>
-              </Box>
+                  </Stack>
+                </Box>
+              </>
             ) : (
               <Center py="xl" style={{ flexDirection: "column" }}>
                 <IconShoppingCart size={40} color="#e0e0e0" />

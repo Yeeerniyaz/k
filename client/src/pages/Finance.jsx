@@ -22,6 +22,7 @@ import {
   Card,
   ThemeIcon,
   Box,
+  Divider,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -269,11 +270,6 @@ export default function Finance() {
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={2} style={{ color: "#1B2E3D" }}>
-            <IconBusinessplan
-              size={26}
-              color="#FF8C00"
-              style={{ verticalAlign: "bottom", marginRight: "8px" }}
-            />
             Финансовый учет
           </Title>
           <Text c="dimmed" mt={5}>
@@ -488,7 +484,7 @@ export default function Finance() {
       </Paper>
 
       {/* ========================================== */}
-      {/* ОСНОВНАЯ ТАБЛИЦА ТРАНЗАКЦИЙ (С АДАПТИВОМ ДЛЯ МОБИЛОК) */}
+      {/* ОСНОВНОЙ ВЫВОД ДАННЫХ (ТАБЛИЦА ИЛИ КАРТОЧКИ) */}
       {/* ========================================== */}
       <Paper
         withBorder
@@ -504,36 +500,134 @@ export default function Finance() {
             <Skeleton height={40} />
           </div>
         ) : processedTransactions.length > 0 ? (
-          <Box style={{ overflowX: "auto" }}>
-            <Table
-              striped
-              highlightOnHover
-              verticalSpacing="md"
-              horizontalSpacing="lg"
-              style={{ minWidth: 800 }}
-            >
-              <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-                <Table.Tr>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Дата</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Тип</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Категория</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Комментарий</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Сумма</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                    Действия
-                  </Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+          <>
+            {/* 🔥 ДЕСКТОПНАЯ ВЕРСИЯ: ТАБЛИЦА (Скрыта на мобилках) */}
+            <Box visibleFrom="sm" style={{ overflowX: "auto" }}>
+              <Table
+                striped
+                highlightOnHover
+                verticalSpacing="md"
+                horizontalSpacing="lg"
+                style={{ minWidth: 800 }}
+              >
+                <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                  <Table.Tr>
+                    <Table.Th style={{ color: "#1B2E3D" }}>Дата</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>Тип</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>Категория</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>
+                      Комментарий
+                    </Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>Сумма</Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                      Действия
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {processedTransactions.map((transaction) => (
+                    <Table.Tr key={transaction.id}>
+                      <Table.Td>
+                        <Text size="sm" c="dimmed" fw={500}>
+                          {formatDate(
+                            transaction.date || transaction.createdAt,
+                          )}
+                        </Text>
+                      </Table.Td>
+
+                      <Table.Td>
+                        {transaction.type === "INCOME" ? (
+                          <Badge color="green" variant="light">
+                            Доход
+                          </Badge>
+                        ) : (
+                          <Badge color="red" variant="light">
+                            Расход
+                          </Badge>
+                        )}
+                      </Table.Td>
+
+                      <Table.Td>
+                        <Text size="sm" fw={500}>
+                          {transaction.category}
+                        </Text>
+                      </Table.Td>
+
+                      <Table.Td>
+                        <Text size="sm" lineClamp={2} maw={300}>
+                          {transaction.comment || "Без комментария"}
+                        </Text>
+                      </Table.Td>
+
+                      <Table.Td>
+                        {transaction.type === "INCOME" ? (
+                          <Text fw={700} color="green">
+                            +{transaction.amount.toLocaleString("ru-RU")} ₸
+                          </Text>
+                        ) : (
+                          <Text fw={700} color="red">
+                            -{transaction.amount.toLocaleString("ru-RU")} ₸
+                          </Text>
+                        )}
+                      </Table.Td>
+
+                      <Table.Td style={{ textAlign: "right" }}>
+                        <Group gap="xs" justify="flex-end">
+                          {transaction.type === "INCOME" ? (
+                            <Tooltip label="Доход генерируется из заказов (системная запись)">
+                              <ActionIcon
+                                variant="transparent"
+                                color="gray"
+                                style={{ cursor: "not-allowed" }}
+                              >
+                                <IconLock size={16} stroke={1.5} />
+                              </ActionIcon>
+                            </Tooltip>
+                          ) : (
+                            <>
+                              <Tooltip label="Редактировать">
+                                <ActionIcon
+                                  variant="light"
+                                  color="blue"
+                                  onClick={() => handleOpenModal(transaction)}
+                                >
+                                  <IconEdit size={16} stroke={1.5} />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Удалить">
+                                <ActionIcon
+                                  variant="light"
+                                  color="red"
+                                  onClick={() => handleDelete(transaction.id)}
+                                >
+                                  <IconTrash size={16} stroke={1.5} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </>
+                          )}
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+
+            {/* 🔥 МОБИЛЬНАЯ ВЕРСИЯ: КАРТОЧКИ (Показывается только на телефонах) */}
+            <Box hiddenFrom="sm" p="md" bg="#f8f9fa">
+              <Stack gap="md">
                 {processedTransactions.map((transaction) => (
-                  <Table.Tr key={transaction.id}>
-                    <Table.Td>
-                      <Text size="sm" c="dimmed" fw={500}>
+                  <Paper
+                    key={transaction.id}
+                    withBorder
+                    p="md"
+                    radius="md"
+                    shadow="sm"
+                  >
+                    <Group justify="space-between" mb="xs">
+                      <Text size="xs" c="dimmed">
                         {formatDate(transaction.date || transaction.createdAt)}
                       </Text>
-                    </Table.Td>
-
-                    <Table.Td>
                       {transaction.type === "INCOME" ? (
                         <Badge color="green" variant="light">
                           Доход
@@ -543,73 +637,83 @@ export default function Finance() {
                           Расход
                         </Badge>
                       )}
-                    </Table.Td>
+                    </Group>
 
-                    <Table.Td>
-                      <Text size="sm" fw={500}>
+                    <Divider my="sm" />
+
+                    <Box mb="xs">
+                      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                        Категория
+                      </Text>
+                      <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
                         {transaction.category}
                       </Text>
-                    </Table.Td>
+                    </Box>
 
-                    <Table.Td>
-                      <Text size="sm" lineClamp={2} maw={300}>
+                    <Box mb="md">
+                      <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                        Комментарий
+                      </Text>
+                      <Text size="sm" lineClamp={3}>
                         {transaction.comment || "Без комментария"}
                       </Text>
-                    </Table.Td>
+                    </Box>
 
-                    <Table.Td>
-                      {transaction.type === "INCOME" ? (
-                        <Text fw={700} color="green">
-                          +{transaction.amount.toLocaleString("ru-RU")} ₸
+                    <Group justify="space-between" align="flex-end">
+                      <Box>
+                        <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                          Сумма
                         </Text>
-                      ) : (
-                        <Text fw={700} color="red">
-                          -{transaction.amount.toLocaleString("ru-RU")} ₸
-                        </Text>
-                      )}
-                    </Table.Td>
-
-                    <Table.Td style={{ textAlign: "right" }}>
-                      <Group gap="xs" justify="flex-end">
                         {transaction.type === "INCOME" ? (
-                          <Tooltip label="Доход генерируется из заказов (системная запись)">
+                          <Text fw={800} size="lg" color="green">
+                            +{transaction.amount.toLocaleString("ru-RU")} ₸
+                          </Text>
+                        ) : (
+                          <Text fw={800} size="lg" color="red">
+                            -{transaction.amount.toLocaleString("ru-RU")} ₸
+                          </Text>
+                        )}
+                      </Box>
+
+                      <Group gap="xs">
+                        {transaction.type === "INCOME" ? (
+                          <Tooltip label="Системная запись (нельзя редактировать)">
                             <ActionIcon
                               variant="transparent"
                               color="gray"
+                              size="lg"
                               style={{ cursor: "not-allowed" }}
                             >
-                              <IconLock size={16} stroke={1.5} />
+                              <IconLock size={18} stroke={1.5} />
                             </ActionIcon>
                           </Tooltip>
                         ) : (
                           <>
-                            <Tooltip label="Редактировать">
-                              <ActionIcon
-                                variant="light"
-                                color="blue"
-                                onClick={() => handleOpenModal(transaction)}
-                              >
-                                <IconEdit size={16} stroke={1.5} />
-                              </ActionIcon>
-                            </Tooltip>
-                            <Tooltip label="Удалить">
-                              <ActionIcon
-                                variant="light"
-                                color="red"
-                                onClick={() => handleDelete(transaction.id)}
-                              >
-                                <IconTrash size={16} stroke={1.5} />
-                              </ActionIcon>
-                            </Tooltip>
+                            <ActionIcon
+                              variant="light"
+                              color="blue"
+                              size="lg"
+                              onClick={() => handleOpenModal(transaction)}
+                            >
+                              <IconEdit size={18} stroke={1.5} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              size="lg"
+                              onClick={() => handleDelete(transaction.id)}
+                            >
+                              <IconTrash size={18} stroke={1.5} />
+                            </ActionIcon>
                           </>
                         )}
                       </Group>
-                    </Table.Td>
-                  </Table.Tr>
+                    </Group>
+                  </Paper>
                 ))}
-              </Table.Tbody>
-            </Table>
-          </Box>
+              </Stack>
+            </Box>
+          </>
         ) : (
           <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
             <IconReceipt2 size={60} color="#dee2e6" stroke={1.5} />

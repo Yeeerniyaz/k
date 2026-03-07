@@ -19,6 +19,7 @@ import {
   Grid,
   Select,
   Box,
+  Divider,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -74,14 +75,11 @@ export default function Prices() {
     try {
       setLoading(true);
       setError(null);
-      // Используем метод из axios.js
       const response = await apiFetchPrices();
-      // Поддержка различных форматов ответа с бэкенда
       const data = response.data?.data || response.data || [];
       setPrices(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Ошибка загрузки прайсов:", err);
-      // 🔥 Senior Practice: Никаких фейковых данных! Если ошибка - ставим пустой массив.
       setPrices([]);
       setError(
         "Не удалось подключиться к базе цен. Проверьте соединение с сервером.",
@@ -100,7 +98,6 @@ export default function Prices() {
   // ==========================================
   const processedPrices = [...prices]
     .filter((p) => {
-      // Поиск по названию услуги
       const searchString = (p.service || "").toLowerCase();
       return searchString.includes(searchTerm.toLowerCase());
     })
@@ -119,13 +116,11 @@ export default function Prices() {
   // ==========================================
   const handleOpenModal = (item = null) => {
     if (item) {
-      // Режим редактирования
       setEditingId(item.id);
       setService(item.service);
       setUnit(item.unit);
       setPriceValue(item.price);
     } else {
-      // Режим создания
       setEditingId(null);
       setService("");
       setUnit("1 кв.м");
@@ -135,7 +130,7 @@ export default function Prices() {
   };
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ / ОБНОВЛЕНИЕ (REAL DATA)
+  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ / ОБНОВЛЕНИЕ
   // ==========================================
   const handleSave = async (e) => {
     e.preventDefault();
@@ -154,11 +149,9 @@ export default function Prices() {
         await apiAddPrice(payload);
       }
       close();
-      // Сразу запрашиваем обновленный список с сервера
       fetchPrices();
     } catch (err) {
       console.error("Ошибка при сохранении:", err);
-      // 🔥 Выводим реальную ошибку сервера
       alert(
         err.response?.data?.message ||
           "Ошибка при сохранении позиции. Возможно, такая услуга уже существует.",
@@ -169,7 +162,7 @@ export default function Prices() {
   };
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ (REAL DATA)
+  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ
   // ==========================================
   const handleDelete = async (id) => {
     if (
@@ -181,7 +174,6 @@ export default function Prices() {
 
     try {
       await apiDeletePrice(id);
-      // Локально удаляем из стейта только после успешного удаления на сервере
       setPrices((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
@@ -200,11 +192,6 @@ export default function Prices() {
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={2} style={{ color: "#1B2E3D" }}>
-            <IconTags
-              size={26}
-              color="#FF8C00"
-              style={{ verticalAlign: "bottom", marginRight: "8px" }}
-            />
             Прайс-лист
           </Title>
           <Text c="dimmed" mt={5}>
@@ -260,17 +247,18 @@ export default function Prices() {
       {/* ========================================== */}
       <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
         <Grid align="flex-end">
-          <Grid.Col span={{ base: 12, md: 6 }}>
+          {/* 🔥 SENIOR FIX: Сделано sm: 6 для хорошего отображения на планшетах */}
+          <Grid.Col span={{ base: 12, sm: 6 }}>
             <TextInput
               label="Поиск по прайс-листу"
-              placeholder="Название услуги или материала (например: Оракал)..."
+              placeholder="Название (например: Оракал)..."
               leftSection={<IconSearch size={16} />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.currentTarget.value)}
               styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
             />
           </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
+          <Grid.Col span={{ base: 12, sm: 6 }}>
             <Select
               label="Сортировка"
               leftSection={<IconArrowsSort size={16} />}
@@ -289,7 +277,7 @@ export default function Prices() {
       </Paper>
 
       {/* ========================================== */}
-      {/* ТАБЛИЦА ПРАЙС-ЛИСТА (С АДАПТИВОМ ДЛЯ МОБИЛОК) */}
+      {/* ОСНОВНОЙ ВЫВОД ДАННЫХ (ТАБЛИЦА / КАРТОЧКИ) */}
       {/* ========================================== */}
       <Paper
         withBorder
@@ -305,37 +293,108 @@ export default function Prices() {
             <Skeleton height={40} />
           </div>
         ) : processedPrices.length > 0 ? (
-          <Box style={{ overflowX: "auto" }}>
-            <Table
-              striped
-              highlightOnHover
-              verticalSpacing="md"
-              horizontalSpacing="lg"
-              style={{ minWidth: 700 }}
-            >
-              <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
-                <Table.Tr>
-                  <Table.Th style={{ color: "#1B2E3D" }}>
-                    Наименование услуги / материала
-                  </Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D" }}>Единица изм.</Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                    Базовая стоимость
-                  </Table.Th>
-                  <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                    Действия
-                  </Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+          <>
+            {/* 🔥 ДЕСКТОПНАЯ ВЕРСИЯ: ТАБЛИЦА (Скрывается на мобильных) */}
+            <Box visibleFrom="sm" style={{ overflowX: "auto" }}>
+              <Table
+                striped
+                highlightOnHover
+                verticalSpacing="md"
+                horizontalSpacing="lg"
+                style={{ minWidth: 700 }}
+              >
+                <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
+                  <Table.Tr>
+                    <Table.Th style={{ color: "#1B2E3D" }}>
+                      Наименование услуги / материала
+                    </Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D" }}>
+                      Единица изм.
+                    </Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                      Базовая стоимость
+                    </Table.Th>
+                    <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
+                      Действия
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {processedPrices.map((item) => (
+                    <Table.Tr key={item.id}>
+                      <Table.Td>
+                        <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
+                          {item.service}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          color="gray"
+                          variant="light"
+                          style={{ color: "#1B2E3D" }}
+                        >
+                          {item.unit}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: "right" }}>
+                        <Text fw={700} style={{ color: "#1B2E3D" }}>
+                          {item.price.toLocaleString("ru-RU")} ₸
+                        </Text>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: "right" }}>
+                        <Group gap="xs" justify="flex-end">
+                          <Tooltip label="Редактировать цену">
+                            <ActionIcon
+                              variant="light"
+                              color="blue"
+                              onClick={() => handleOpenModal(item)}
+                            >
+                              <IconEdit size={16} stroke={1.5} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Удалить из прайса">
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <IconTrash size={16} stroke={1.5} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+
+            {/* 🔥 МОБИЛЬНАЯ ВЕРСИЯ: КАРТОЧКИ (Показывается только на смартфонах) */}
+            <Box hiddenFrom="sm" p="md" bg="#f8f9fa">
+              <Stack gap="sm">
                 {processedPrices.map((item) => (
-                  <Table.Tr key={item.id}>
-                    <Table.Td>
-                      <Text fw={600} size="sm" style={{ color: "#1B2E3D" }}>
-                        {item.service}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
+                  <Paper
+                    key={item.id}
+                    withBorder
+                    p="md"
+                    radius="md"
+                    shadow="sm"
+                  >
+                    <Group
+                      justify="space-between"
+                      align="flex-start"
+                      wrap="nowrap"
+                    >
+                      <Box style={{ flex: 1 }}>
+                        <Text
+                          fw={600}
+                          size="sm"
+                          style={{ color: "#1B2E3D" }}
+                          lh={1.4}
+                        >
+                          {item.service}
+                        </Text>
+                      </Box>
                       <Badge
                         color="gray"
                         variant="light"
@@ -343,41 +402,52 @@ export default function Prices() {
                       >
                         {item.unit}
                       </Badge>
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: "right" }}>
-                      <Text fw={700} style={{ color: "#1B2E3D" }}>
-                        {item.price.toLocaleString("ru-RU")} ₸
-                      </Text>
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: "right" }}>
-                      <Group gap="xs" justify="flex-end">
-                        <Tooltip label="Редактировать цену">
-                          <ActionIcon
-                            variant="light"
-                            color="blue"
-                            onClick={() => handleOpenModal(item)}
-                          >
-                            <IconEdit size={16} stroke={1.5} />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Удалить из прайса">
-                          <ActionIcon
-                            variant="light"
-                            color="red"
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            <IconTrash size={16} stroke={1.5} />
-                          </ActionIcon>
-                        </Tooltip>
+                    </Group>
+
+                    <Divider my="sm" />
+
+                    <Group justify="space-between" align="flex-end">
+                      <Box>
+                        <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                          Базовая стоимость
+                        </Text>
+                        <Text fw={800} size="lg" style={{ color: "#1B2E3D" }}>
+                          {item.price.toLocaleString("ru-RU")} ₸
+                        </Text>
+                      </Box>
+
+                      <Group gap="xs">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          size="lg"
+                          onClick={() => handleOpenModal(item)}
+                        >
+                          <IconEdit size={18} stroke={1.5} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          size="lg"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <IconTrash size={18} stroke={1.5} />
+                        </ActionIcon>
                       </Group>
-                    </Table.Td>
-                  </Table.Tr>
+                    </Group>
+                  </Paper>
                 ))}
-              </Table.Tbody>
-            </Table>
-          </Box>
+              </Stack>
+            </Box>
+          </>
         ) : (
-          <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
+          <Center
+            style={{
+              padding: "60px 20px",
+              flexDirection: "column",
+              textAlign: "center",
+            }}
+          >
             <IconReportMoney size={48} color="#e0e0e0" stroke={1.5} />
             <Text size="lg" fw={500} mt="md" style={{ color: "#1B2E3D" }}>
               Прайс-лист пуст
