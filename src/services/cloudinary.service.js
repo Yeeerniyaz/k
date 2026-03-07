@@ -31,16 +31,29 @@ export const uploadImage = (imageBuffer, folderName = 'royal_banners_portfolio')
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 folder: folderName,
-                // 🔥 SENIOR FIX v3: Күштеп JPG форматына айналдырамыз!
-                // Бұл HEIC-ті де, WebP-ді де жұтып, барлық құрылғыға түсінікті JPG қылып шығарады.
-                format: 'jpg', 
-                quality: 'auto:good'
+                // 🔥 SENIOR FIX v4: Полностью убираем принудительную конвертацию при загрузке.
+                // Пусть Cloudinary сохраняет оригинальный файл (даже если это тяжелый HEIC с iPhone),
+                // чтобы процесс загрузки не обрывался и не создавал "битые" файлы.
+                resource_type: 'auto',
             },
             (error, result) => {
                 if (error) {
                     console.error('💥 Ошибка Cloudinary (Upload):', error);
-                    return reject(new AppError('Не удалось загрузить изображение в облако.', 500));
+                    return reject(new AppError('Не удалось загрузить изображение в облако. Проверьте настройки.', 500));
                 }
+                
+                // 🔥 ГЛАВНЫЙ СЕНЬОРСКИЙ ТРЮК (ON-THE-FLY OPTIMIZATION):
+                // Мы не ломаем файл при загрузке, но в базу данных сохраняем "умную" ссылку.
+                // f_auto = Cloudinary сам решит: отдать айфону JPG, а андроиду WebP.
+                // q_auto = автоматическое сжатие без потери качества.
+                // w_1200 = ограничение ширины до 1200px (чтобы грузилось моментально).
+                if (result.secure_url && result.secure_url.includes('/upload/')) {
+                    result.secure_url = result.secure_url.replace(
+                        '/upload/', 
+                        '/upload/f_auto,q_auto,w_1200/'
+                    );
+                }
+                
                 resolve(result); 
             }
         );
