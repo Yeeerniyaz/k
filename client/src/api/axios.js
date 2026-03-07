@@ -8,7 +8,7 @@ const hostname = window.location.hostname;
 const protocol = window.location.protocol;
 
 // 🔥 ЖЕСТКО указываем порт бэкенда (5005), чтобы телефон не терял сервер
-export const API_URL = import.meta.env.VITE_API_URL || `${protocol}//${hostname}:5005/api`;
+export const API_URL = "http://82.115.43.240:5005/api";
 
 // Экспортируем чистый домен бэкенда (без /api на конце)
 export const BASE_URL = API_URL.replace('/api', '');
