@@ -82,8 +82,9 @@ export const updatePrice = (id, priceData) => API.put(`/prices/${id}`, priceData
 export const deletePrice = (id) => API.delete(`/prices/${id}`);
 
 export const fetchPortfolio = () => API.get('/portfolio');
-// 🔥 SENIOR FIX: Убрали жесткие заголовки. Теперь браузер сам поставит правильный boundary!
-export const addPortfolio = (formData) => API.post('/portfolio', formData);
+export const addPortfolio = (formData) => API.post('/portfolio', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+}); 
 export const updatePortfolioItem = (id, data) => API.put(`/portfolio/${id}`, data);
 export const deletePortfolioItem = (id) => API.delete(`/portfolio/${id}`);
 
