@@ -17,10 +17,15 @@ import {
   Transition,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconPhotoOff, IconX, IconArrowLeft } from "@tabler/icons-react";
+import {
+  IconPhotoOff,
+  IconX,
+  IconArrowLeft,
+  IconPhoto,
+} from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
-// 🔥 Senior Update: Импортируем готовый метод из axios.js
+// Импортируем готовый метод из axios.js
 import { fetchPortfolio as apiFetchPortfolio } from "../api/axios.js";
 
 export default function PublicPortfolio() {
@@ -36,9 +41,10 @@ export default function PublicPortfolio() {
   // ФИЛЬТРАЦИЯ
   const [activeCategory, setActiveCategory] = useState("ALL");
 
-  // ПРОСМОТР СУБЪЕКТА (LIGHTBOX)
+  // ПРОСМОТР ПРОЕКТА (LIGHTBOX С ГАЛЕРЕЕЙ)
   const [opened, { open, close }] = useDisclosure(false);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0); // Индекс активной картинки в галерее
 
   // Категории для красивого отображения клиентам
   const categories = [
@@ -58,12 +64,10 @@ export default function PublicPortfolio() {
     try {
       setLoading(true);
       setError(null);
-      // 🔥 Используем метод из нового axios.js
       const response = await apiFetchPortfolio();
       setItems(response.data.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки портфолио:", err);
-      // 🔥 Senior Practice: Никаких фейковых данных! Если сервер не отвечает — пустой массив.
       setItems([]);
       setError("Не удалось подключиться к серверу. Попробуйте зайти позже.");
     } finally {
@@ -78,21 +82,41 @@ export default function PublicPortfolio() {
   // ==========================================
   // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
   // ==========================================
-  const handleImageClick = (item) => {
-    setSelectedImage(item);
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setCurrentImageIndex(0); // При открытии всегда показываем первую картинку
     open();
   };
 
   const getCategoryLabel = (val) => {
-    const cat = categories.find((c) => c.value === val);
+    const cat = categories.find(
+      (c) => c.value === val || c.value.replace("-", "_").toUpperCase() === val,
+    );
     return cat ? cat.label : val;
+  };
+
+  // Извлекаем обложку (совместимо со старым форматом imageUrl и новым imageUrls)
+  const getCoverImage = (item) => {
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
+    if (item.imageUrl) return item.imageUrl;
+    return null;
+  };
+
+  // Извлекаем все картинки (нормализуем в массив)
+  const getAllImages = (item) => {
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
+    if (item.imageUrl) return [item.imageUrl];
+    return [];
   };
 
   // Фильтруем и сортируем (свежие сверху)
   const filteredItems = items
-    .filter((item) =>
-      activeCategory === "ALL" ? true : item.category === activeCategory,
-    )
+    .filter((item) => {
+      if (activeCategory === "ALL") return true;
+      // Нормализуем для точного сравнения (на бэке может быть BANNERS, на фронте banners)
+      const itemCat = item.category?.toLowerCase().replace("_", "-");
+      return itemCat === activeCategory;
+    })
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
   return (
@@ -187,74 +211,104 @@ export default function PublicPortfolio() {
           </Grid>
         ) : filteredItems.length > 0 ? (
           <Grid gutter="xl">
-            {filteredItems.map((item) => (
-              <Grid.Col span={{ base: 12, sm: 6, md: 4 }} key={item.id}>
-                <Card
-                  shadow="sm"
-                  padding="lg"
-                  radius="md"
-                  withBorder
-                  style={{
-                    cursor: "pointer",
-                    transition: "transform 0.3s ease, box-shadow 0.3s ease",
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 12px 24px rgba(27, 46, 61, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "var(--mantine-shadow-sm)";
-                  }}
-                  onClick={() => handleImageClick(item)}
-                >
-                  <Card.Section
-                    style={{ position: "relative", overflow: "hidden" }}
-                  >
-                    <Image
-                      src={item.imageUrl}
-                      height={280}
-                      alt={item.title}
-                      fallbackSrc="https://placehold.co/600x400?text=Изображение+не+найдено"
-                      style={{ transition: "transform 0.5s ease" }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.transform = "scale(1.05)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.transform = "scale(1)")
-                      }
-                    />
-                    <Badge
-                      variant="filled"
-                      size="md"
-                      style={{
-                        position: "absolute",
-                        top: 15,
-                        right: 15,
-                        backgroundColor: "rgba(27, 46, 61, 0.85)",
-                        backdropFilter: "blur(4px)",
-                      }}
-                    >
-                      {getCategoryLabel(item.category)}
-                    </Badge>
-                  </Card.Section>
+            {filteredItems.map((item) => {
+              const coverImage = getCoverImage(item);
+              const allImages = getAllImages(item);
 
-                  <Box mt="md" style={{ flexGrow: 1 }}>
-                    <Title order={4} style={{ color: "#1B2E3D" }} lineClamp={1}>
-                      {item.title}
-                    </Title>
-                    <Text size="sm" c="dimmed" mt="xs" lineClamp={2}>
-                      {item.description || "Описание проекта..."}
-                    </Text>
-                  </Box>
-                </Card>
-              </Grid.Col>
-            ))}
+              return (
+                <Grid.Col span={{ base: 12, sm: 6, md: 4 }} key={item.id}>
+                  <Card
+                    shadow="sm"
+                    padding="lg"
+                    radius="md"
+                    withBorder
+                    style={{
+                      cursor: "pointer",
+                      transition: "transform 0.3s ease, box-shadow 0.3s ease",
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-5px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 12px 24px rgba(27, 46, 61, 0.15)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow =
+                        "var(--mantine-shadow-sm)";
+                    }}
+                    onClick={() => handleItemClick(item)}
+                  >
+                    <Card.Section
+                      style={{ position: "relative", overflow: "hidden" }}
+                    >
+                      <Image
+                        src={coverImage}
+                        height={280}
+                        alt={item.title}
+                        fallbackSrc="https://placehold.co/600x400?text=Изображение+не+найдено"
+                        style={{ transition: "transform 0.5s ease" }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.transform = "scale(1.05)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.transform = "scale(1)")
+                        }
+                      />
+
+                      {/* Бейдж категории */}
+                      <Badge
+                        variant="filled"
+                        size="md"
+                        style={{
+                          position: "absolute",
+                          top: 15,
+                          right: 15,
+                          backgroundColor: "rgba(27, 46, 61, 0.85)",
+                          backdropFilter: "blur(4px)",
+                        }}
+                      >
+                        {getCategoryLabel(item.category)}
+                      </Badge>
+
+                      {/* 🔥 SENIOR ФИЧА: Если картинок больше одной, показываем счетчик */}
+                      {allImages.length > 1 && (
+                        <Badge
+                          variant="white"
+                          size="sm"
+                          leftSection={<IconPhoto size={12} />}
+                          style={{
+                            position: "absolute",
+                            bottom: 15,
+                            right: 15,
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+                            fontWeight: 700,
+                            color: "#1B2E3D",
+                          }}
+                        >
+                          +{allImages.length - 1} фото
+                        </Badge>
+                      )}
+                    </Card.Section>
+
+                    <Box mt="md" style={{ flexGrow: 1 }}>
+                      <Title
+                        order={4}
+                        style={{ color: "#1B2E3D" }}
+                        lineClamp={1}
+                      >
+                        {item.title}
+                      </Title>
+                      <Text size="sm" c="dimmed" mt="xs" lineClamp={2}>
+                        {item.description || "Описание проекта..."}
+                      </Text>
+                    </Box>
+                  </Card>
+                </Grid.Col>
+              );
+            })}
           </Grid>
         ) : (
           <Center
@@ -284,7 +338,7 @@ export default function PublicPortfolio() {
       </Container>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО LIGHTBOX (СУПЕР-ПРОСМОТР) */}
+      {/* МОДАЛЬНОЕ ОКНО LIGHTBOX С ГАЛЕРЕЕЙ */}
       {/* ========================================== */}
       <Modal
         opened={opened}
@@ -298,7 +352,7 @@ export default function PublicPortfolio() {
           body: { padding: 0 },
         }}
       >
-        {selectedImage && (
+        {selectedItem && (
           <Box
             style={{ position: "relative", maxWidth: "90vw", width: "1000px" }}
           >
@@ -320,18 +374,46 @@ export default function PublicPortfolio() {
               <IconX size={20} />
             </ActionIcon>
 
-            {/* Само изображение */}
+            {/* Главное изображение */}
             <Image
-              src={selectedImage.imageUrl}
-              alt={selectedImage.title}
+              src={getAllImages(selectedItem)[currentImageIndex]}
+              alt={selectedItem.title}
               fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
               style={{
-                maxHeight: "80vh",
+                maxHeight: "75vh",
                 objectFit: "contain",
                 borderRadius: "12px",
                 backgroundColor: "#fff",
+                transition: "opacity 0.2s ease-in-out",
               }}
             />
+
+            {/* 🔥 SENIOR ФИЧА: Миниатюры (Thumbnails), если картинок больше 1 */}
+            {getAllImages(selectedItem).length > 1 && (
+              <Group mt="sm" justify="center" gap="xs">
+                {getAllImages(selectedItem).map((imgUrl, idx) => (
+                  <Image
+                    key={idx}
+                    src={imgUrl}
+                    w={60}
+                    h={60}
+                    radius="md"
+                    onClick={() => setCurrentImageIndex(idx)}
+                    style={{
+                      objectFit: "cover",
+                      cursor: "pointer",
+                      border:
+                        currentImageIndex === idx
+                          ? "3px solid #FF8C00"
+                          : "2px solid transparent",
+                      opacity: currentImageIndex === idx ? 1 : 0.6,
+                      transition: "all 0.2s ease",
+                      backgroundColor: "white",
+                    }}
+                  />
+                ))}
+              </Group>
+            )}
 
             {/* Блок с описанием под фото */}
             <Box
@@ -345,14 +427,14 @@ export default function PublicPortfolio() {
             >
               <Group justify="space-between" align="flex-start" mb="xs">
                 <Title order={3} style={{ color: "#1B2E3D" }}>
-                  {selectedImage.title}
+                  {selectedItem.title}
                 </Title>
                 <Badge size="lg" variant="outline" color="gray">
-                  {getCategoryLabel(selectedImage.category)}
+                  {getCategoryLabel(selectedItem.category)}
                 </Badge>
               </Group>
               <Text size="md" c="dimmed" style={{ lineHeight: 1.6 }}>
-                {selectedImage.description ||
+                {selectedItem.description ||
                   "Детальное описание для данного проекта отсутствует."}
               </Text>
             </Box>

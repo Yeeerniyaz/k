@@ -26,6 +26,7 @@ import {
   IconZoomIn,
   IconPhotoOff,
   IconArrowUp,
+  IconPhoto,
 } from "@tabler/icons-react";
 
 // 🔥 Senior Update: Импортируем метод из нового единого axios.js
@@ -76,10 +77,11 @@ export default function Category() {
   // ==========================================
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // 🔥 НОВОЕ: Обработка ошибок для пользователей
+  const [error, setError] = useState(null); // Обработка ошибок для пользователей
 
-  // Состояния для Lightbox (увеличенного просмотра)
-  const [selectedImage, setSelectedImage] = useState(null);
+  // Состояния для Lightbox (увеличенного просмотра с галереей)
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // ==========================================
   // ЗАГРУЗКА И ФИЛЬТРАЦИЯ ПОРТФОЛИО (REAL DATA)
@@ -94,7 +96,11 @@ export default function Category() {
         const allItems = response.data.data || response.data || [];
 
         // Фильтруем работы, оставляем только те, что относятся к текущей категории
-        const filteredItems = allItems.filter((item) => item.category === id);
+        // Нормализуем строку (заменяем _ на - и делаем lowercase)
+        const filteredItems = allItems.filter((item) => {
+          const itemCat = item.category?.toLowerCase().replace("_", "-");
+          return itemCat === id;
+        });
         setItems(filteredItems);
       } catch (err) {
         console.error("Ошибка загрузки галереи:", err);
@@ -109,6 +115,28 @@ export default function Category() {
 
     fetchCategoryItems();
   }, [id]);
+
+  // ==========================================
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+  // ==========================================
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setCurrentImageIndex(0); // Сбрасываем индекс при открытии новой работы
+  };
+
+  // Извлекаем обложку (совместимо со старым форматом imageUrl и новым imageUrls)
+  const getCoverImage = (item) => {
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
+    if (item.imageUrl) return item.imageUrl;
+    return null;
+  };
+
+  // Извлекаем все картинки (нормализуем в массив)
+  const getAllImages = (item) => {
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
+    if (item.imageUrl) return [item.imageUrl];
+    return [];
+  };
 
   return (
     <div
@@ -179,7 +207,12 @@ export default function Category() {
             <Title
               order={1}
               ta="center"
-              style={{ color: "#1B2E3D", fontSize: "clamp(32px, 5vw, 48px)" }}
+              style={{
+                color: "#1B2E3D",
+                fontSize: "clamp(32px, 5vw, 48px)",
+                fontFamily: '"Alyamama", sans-serif',
+                letterSpacing: "1px",
+              }}
             >
               {currentMeta.title}
             </Title>
@@ -217,75 +250,102 @@ export default function Category() {
           </Grid>
         ) : items.length > 0 ? (
           <Grid gutter="xl">
-            {items.map((item) => (
-              <Grid.Col span={{ base: 12, sm: 6, md: 4 }} key={item.id}>
-                <Card
-                  shadow="sm"
-                  padding="lg"
-                  radius="md"
-                  withBorder
-                  style={{
-                    cursor: "pointer",
-                    transition: "transform 0.3s ease, box-shadow 0.3s ease",
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-5px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 12px 24px rgba(27, 46, 61, 0.15)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "var(--mantine-shadow-sm)";
-                  }}
-                  onClick={() => setSelectedImage(item)}
-                >
-                  <Card.Section
-                    style={{ position: "relative", overflow: "hidden" }}
+            {items.map((item) => {
+              const coverImage = getCoverImage(item);
+              const allImages = getAllImages(item);
+              return (
+                <Grid.Col span={{ base: 12, sm: 6, md: 4 }} key={item.id}>
+                  <Card
+                    shadow="sm"
+                    padding="lg"
+                    radius="md"
+                    withBorder
+                    style={{
+                      cursor: "pointer",
+                      transition: "transform 0.3s ease, box-shadow 0.3s ease",
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-5px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 12px 24px rgba(27, 46, 61, 0.15)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow =
+                        "var(--mantine-shadow-sm)";
+                    }}
+                    onClick={() => handleItemClick(item)}
                   >
-                    <Image
-                      src={item.imageUrl}
-                      height={250}
-                      alt={item.title}
-                      fallbackSrc="https://placehold.co/600x400?text=Изображение+не+найдено"
-                      style={{ transition: "transform 0.5s ease" }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.transform = "scale(1.05)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.transform = "scale(1)")
-                      }
-                    />
-                    {/* Иконка лупы поверх изображения */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 10,
-                        right: 10,
-                        backgroundColor: "rgba(0,0,0,0.5)",
-                        borderRadius: "50%",
-                        padding: "8px",
-                        display: "flex",
-                      }}
+                    <Card.Section
+                      style={{ position: "relative", overflow: "hidden" }}
                     >
-                      <IconZoomIn color="white" size={20} />
-                    </div>
-                  </Card.Section>
+                      <Image
+                        src={coverImage}
+                        height={250}
+                        alt={item.title}
+                        fallbackSrc="https://placehold.co/600x400?text=Изображение+не+найдено"
+                        style={{ transition: "transform 0.5s ease" }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.transform = "scale(1.05)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.transform = "scale(1)")
+                        }
+                      />
 
-                  <Box mt="md" style={{ flexGrow: 1 }}>
-                    <Title order={4} style={{ color: "#1B2E3D" }} lineClamp={1}>
-                      {item.title}
-                    </Title>
-                    <Text size="sm" c="dimmed" mt="xs" lineClamp={3}>
-                      {item.description || "Описание отсутствует"}
-                    </Text>
-                  </Box>
-                </Card>
-              </Grid.Col>
-            ))}
+                      {/* 🔥 SENIOR ФИЧА: Если картинок больше одной, показываем счетчик */}
+                      {allImages.length > 1 && (
+                        <Badge
+                          variant="white"
+                          size="sm"
+                          leftSection={<IconPhoto size={12} />}
+                          style={{
+                            position: "absolute",
+                            bottom: 10,
+                            right: 10,
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+                            fontWeight: 700,
+                            color: "#1B2E3D",
+                          }}
+                        >
+                          +{allImages.length - 1} фото
+                        </Badge>
+                      )}
+
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 10,
+                          right: 10,
+                          backgroundColor: "rgba(0,0,0,0.5)",
+                          borderRadius: "50%",
+                          padding: "8px",
+                          display: "flex",
+                        }}
+                      >
+                        <IconZoomIn color="white" size={20} />
+                      </div>
+                    </Card.Section>
+
+                    <Box mt="md" style={{ flexGrow: 1 }}>
+                      <Title
+                        order={4}
+                        style={{ color: "#1B2E3D" }}
+                        lineClamp={1}
+                      >
+                        {item.title}
+                      </Title>
+                      <Text size="sm" c="dimmed" mt="xs" lineClamp={3}>
+                        {item.description || "Описание отсутствует"}
+                      </Text>
+                    </Box>
+                  </Card>
+                </Grid.Col>
+              );
+            })}
           </Grid>
         ) : (
           <Center
@@ -315,11 +375,11 @@ export default function Category() {
       </Container>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА КАРТИНКИ (LIGHTBOX) */}
+      {/* МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА КАРТИНКИ (LIGHTBOX С ГАЛЕРЕЕЙ) */}
       {/* ========================================== */}
       <Modal
-        opened={!!selectedImage}
-        onClose={() => setSelectedImage(null)}
+        opened={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
         size="auto"
         centered
         withCloseButton={false}
@@ -329,7 +389,7 @@ export default function Category() {
           body: { padding: 0 },
         }}
       >
-        {selectedImage && (
+        {selectedItem && (
           <div
             style={{
               position: "relative",
@@ -337,20 +397,50 @@ export default function Category() {
               maxHeight: "90vh",
             }}
           >
+            {/* Главное изображение */}
             <Image
-              src={selectedImage.imageUrl}
-              alt={selectedImage.title}
+              src={getAllImages(selectedItem)[currentImageIndex]}
+              alt={selectedItem.title}
               fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
               style={{
-                maxHeight: "85vh",
+                maxHeight: "75vh",
                 objectFit: "contain",
                 borderRadius: "8px",
+                transition: "opacity 0.2s ease-in-out",
               }}
             />
+
+            {/* Галерея Thumbnails */}
+            {getAllImages(selectedItem).length > 1 && (
+              <Group mt="sm" justify="center" gap="xs">
+                {getAllImages(selectedItem).map((imgUrl, idx) => (
+                  <Image
+                    key={idx}
+                    src={imgUrl}
+                    w={60}
+                    h={60}
+                    radius="md"
+                    onClick={() => setCurrentImageIndex(idx)}
+                    style={{
+                      objectFit: "cover",
+                      cursor: "pointer",
+                      border:
+                        currentImageIndex === idx
+                          ? "3px solid #FF8C00"
+                          : "2px solid transparent",
+                      opacity: currentImageIndex === idx ? 1 : 0.6,
+                      transition: "all 0.2s ease",
+                      backgroundColor: "white",
+                    }}
+                  />
+                ))}
+              </Group>
+            )}
+
             <div
               style={{
                 position: "absolute",
-                bottom: 0,
+                bottom: getAllImages(selectedItem).length > 1 ? 80 : 0,
                 left: 0,
                 right: 0,
                 background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
@@ -360,15 +450,15 @@ export default function Category() {
               }}
             >
               <Title order={3} style={{ color: "white" }}>
-                {selectedImage.title}
+                {selectedItem.title}
               </Title>
-              {selectedImage.description && (
+              {selectedItem.description && (
                 <Text
                   size="sm"
                   style={{ color: "rgba(255,255,255,0.8)" }}
                   mt="xs"
                 >
-                  {selectedImage.description}
+                  {selectedItem.description}
                 </Text>
               )}
             </div>
@@ -384,7 +474,7 @@ export default function Category() {
               w={40}
               h={40}
               p={0}
-              onClick={() => setSelectedImage(null)}
+              onClick={() => setSelectedItem(null)}
             >
               ✕
             </Button>
