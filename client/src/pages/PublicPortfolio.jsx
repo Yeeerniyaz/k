@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Container,
   Title,
@@ -14,14 +14,15 @@ import {
   Button,
   ActionIcon,
   Box,
-  Transition,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
 import {
   IconPhotoOff,
   IconX,
   IconArrowLeft,
   IconPhoto,
+  IconZoomIn,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
@@ -41,10 +42,9 @@ export default function PublicPortfolio() {
   // ФИЛЬТРАЦИЯ
   const [activeCategory, setActiveCategory] = useState("ALL");
 
-  // ПРОСМОТР ПРОЕКТА (LIGHTBOX С ГАЛЕРЕЕЙ)
-  const [opened, { open, close }] = useDisclosure(false);
+  // ПРОСМОТР ПРОЕКТА (FULLSCREEN LIGHTBOX)
   const [selectedItem, setSelectedItem] = useState(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0); // Индекс активной картинки в галерее
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Категории для красивого отображения клиентам
   const categories = [
@@ -65,7 +65,7 @@ export default function PublicPortfolio() {
       setLoading(true);
       setError(null);
       const response = await apiFetchPortfolio();
-      setItems(response.data.data || response.data || []);
+      setItems(response.data?.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки портфолио:", err);
       setItems([]);
@@ -80,14 +80,8 @@ export default function PublicPortfolio() {
   }, []);
 
   // ==========================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ЛАЙТБОКС
   // ==========================================
-  const handleItemClick = (item) => {
-    setSelectedItem(item);
-    setCurrentImageIndex(0); // При открытии всегда показываем первую картинку
-    open();
-  };
-
   const getCategoryLabel = (val) => {
     const cat = categories.find(
       (c) => c.value === val || c.value.replace("-", "_").toUpperCase() === val,
@@ -95,32 +89,73 @@ export default function PublicPortfolio() {
     return cat ? cat.label : val;
   };
 
-  // Извлекаем обложку (совместимо со старым форматом imageUrl и новым imageUrls)
   const getCoverImage = (item) => {
     if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
     if (item.imageUrl) return item.imageUrl;
     return null;
   };
 
-  // Извлекаем все картинки (нормализуем в массив)
   const getAllImages = (item) => {
+    if (!item) return [];
     if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
     if (item.imageUrl) return [item.imageUrl];
     return [];
   };
 
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setCurrentImageIndex(0);
+  };
+
+  const closeLightbox = () => {
+    setSelectedItem(null);
+  };
+
+  const lightboxImages = getAllImages(selectedItem);
+
+  const handleNext = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev === lightboxImages.length - 1 ? 0 : prev + 1,
+    );
+  }, [lightboxImages.length]);
+
+  const handlePrev = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? lightboxImages.length - 1 : prev - 1,
+    );
+  }, [lightboxImages.length]);
+
+  // Поддержка управления с клавиатуры
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!selectedItem) return;
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "Escape") closeLightbox();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedItem, handleNext, handlePrev]);
+
   // Фильтруем и сортируем (свежие сверху)
   const filteredItems = items
     .filter((item) => {
       if (activeCategory === "ALL") return true;
-      // Нормализуем для точного сравнения (на бэке может быть BANNERS, на фронте banners)
       const itemCat = item.category?.toLowerCase().replace("_", "-");
       return itemCat === activeCategory;
     })
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
   return (
-    <Box bg="#f8f9fa" style={{ minHeight: "100vh", paddingBottom: "80px" }}>
+    <Box
+      bg="#f8f9fa"
+      style={{
+        minHeight: "100vh",
+        paddingBottom: "80px",
+        fontFamily: '"Google Sans", sans-serif',
+      }}
+    >
       {/* ========================================== */}
       {/* ШАПКА ПОРТФОЛИО */}
       {/* ========================================== */}
@@ -131,7 +166,6 @@ export default function PublicPortfolio() {
         style={{ borderBottom: "1px solid #eaeaea" }}
       >
         <Container size="lg">
-          {/* Кнопка "Назад" */}
           <Group mb="xl">
             <Button
               variant="subtle"
@@ -258,7 +292,6 @@ export default function PublicPortfolio() {
                         }
                       />
 
-                      {/* Бейдж категории */}
                       <Badge
                         variant="filled"
                         size="md"
@@ -273,7 +306,20 @@ export default function PublicPortfolio() {
                         {getCategoryLabel(item.category)}
                       </Badge>
 
-                      {/* 🔥 SENIOR ФИЧА: Если картинок больше одной, показываем счетчик */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 15,
+                          left: 15,
+                          backgroundColor: "rgba(0,0,0,0.5)",
+                          borderRadius: "50%",
+                          padding: "8px",
+                          display: "flex",
+                        }}
+                      >
+                        <IconZoomIn color="white" size={20} />
+                      </div>
+
                       {allImages.length > 1 && (
                         <Badge
                           variant="white"
@@ -338,107 +384,165 @@ export default function PublicPortfolio() {
       </Container>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО LIGHTBOX С ГАЛЕРЕЕЙ */}
+      {/* FULLSCREEN LIGHTBOX (ПРЕМИАЛЬНЫЙ ПРОСМОТР) */}
       {/* ========================================== */}
       <Modal
-        opened={opened}
-        onClose={close}
-        size="auto"
-        centered
+        opened={!!selectedItem}
+        onClose={closeLightbox}
+        fullScreen
         withCloseButton={false}
-        overlayProps={{ backgroundOpacity: 0.8, blur: 5 }}
+        transitionProps={{ transition: "fade", duration: 250 }}
         styles={{
-          content: { backgroundColor: "transparent", boxShadow: "none" },
-          body: { padding: 0 },
+          inner: { padding: 0 },
+          content: { backgroundColor: "#0f0f0f", color: "white" },
+          body: {
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            padding: 0,
+          },
         }}
       >
         {selectedItem && (
-          <Box
-            style={{ position: "relative", maxWidth: "90vw", width: "1000px" }}
-          >
-            {/* Кнопка закрытия */}
-            <ActionIcon
-              variant="filled"
-              color="dark"
-              size="xl"
-              radius="xl"
-              style={{
-                position: "absolute",
-                top: -20,
-                right: -20,
-                zIndex: 10,
-                border: "2px solid white",
-              }}
-              onClick={close}
+          <>
+            {/* ВЕРХНЯЯ ПАНЕЛЬ: Заголовок и закрытие */}
+            <Group
+              justify="space-between"
+              align="flex-start"
+              p="md"
+              style={{ flexShrink: 0 }}
             >
-              <IconX size={20} />
-            </ActionIcon>
-
-            {/* Главное изображение */}
-            <Image
-              src={getAllImages(selectedItem)[currentImageIndex]}
-              alt={selectedItem.title}
-              fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
-              style={{
-                maxHeight: "75vh",
-                objectFit: "contain",
-                borderRadius: "12px",
-                backgroundColor: "#fff",
-                transition: "opacity 0.2s ease-in-out",
-              }}
-            />
-
-            {/* 🔥 SENIOR ФИЧА: Миниатюры (Thumbnails), если картинок больше 1 */}
-            {getAllImages(selectedItem).length > 1 && (
-              <Group mt="sm" justify="center" gap="xs">
-                {getAllImages(selectedItem).map((imgUrl, idx) => (
-                  <Image
-                    key={idx}
-                    src={imgUrl}
-                    w={60}
-                    h={60}
-                    radius="md"
-                    onClick={() => setCurrentImageIndex(idx)}
-                    style={{
-                      objectFit: "cover",
-                      cursor: "pointer",
-                      border:
-                        currentImageIndex === idx
-                          ? "3px solid #FF8C00"
-                          : "2px solid transparent",
-                      opacity: currentImageIndex === idx ? 1 : 0.6,
-                      transition: "all 0.2s ease",
-                      backgroundColor: "white",
-                    }}
-                  />
-                ))}
-              </Group>
-            )}
-
-            {/* Блок с описанием под фото */}
-            <Box
-              bg="white"
-              p="xl"
-              mt="md"
-              style={{
-                borderRadius: "12px",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-              }}
-            >
-              <Group justify="space-between" align="flex-start" mb="xs">
-                <Title order={3} style={{ color: "#1B2E3D" }}>
+              <Box style={{ maxWidth: "80%" }}>
+                <Title order={3} style={{ color: "white" }} lineClamp={1}>
                   {selectedItem.title}
                 </Title>
-                <Badge size="lg" variant="outline" color="gray">
+                <Text size="sm" style={{ color: "rgba(255,255,255,0.7)" }}>
                   {getCategoryLabel(selectedItem.category)}
-                </Badge>
-              </Group>
-              <Text size="md" c="dimmed" style={{ lineHeight: 1.6 }}>
-                {selectedItem.description ||
-                  "Детальное описание для данного проекта отсутствует."}
-              </Text>
+                </Text>
+                {selectedItem.description && (
+                  <Text
+                    size="sm"
+                    mt={5}
+                    style={{ color: "rgba(255,255,255,0.9)" }}
+                    lineClamp={2}
+                  >
+                    {selectedItem.description}
+                  </Text>
+                )}
+              </Box>
+              <ActionIcon
+                onClick={closeLightbox}
+                size="xl"
+                variant="transparent"
+                style={{ color: "white" }}
+              >
+                <IconX size={32} />
+              </ActionIcon>
+            </Group>
+
+            {/* ЦЕНТРАЛЬНАЯ ЗОНА: Основное фото и стрелки */}
+            <Box
+              style={{
+                flexGrow: 1,
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                padding: "0 16px",
+              }}
+            >
+              {lightboxImages.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrev();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronLeft size={40} />
+                </ActionIcon>
+              )}
+
+              <Image
+                src={lightboxImages[currentImageIndex]}
+                alt={selectedItem.title}
+                fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
+                style={{
+                  maxHeight: "75vh",
+                  maxWidth: "100%",
+                  objectFit: "contain",
+                  transition: "opacity 0.2s ease",
+                }}
+              />
+
+              {lightboxImages.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNext();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronRight size={40} />
+                </ActionIcon>
+              )}
             </Box>
-          </Box>
+
+            {/* НИЖНЯЯ ПАНЕЛЬ: Миниатюры */}
+            {lightboxImages.length > 1 && (
+              <Box
+                style={{
+                  flexShrink: 0,
+                  padding: "16px",
+                  overflowX: "auto",
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <Group gap="sm" style={{ flexWrap: "nowrap" }}>
+                  {lightboxImages.map((imgUrl, idx) => (
+                    <Image
+                      key={idx}
+                      src={imgUrl}
+                      w={60}
+                      h={60}
+                      radius="md"
+                      onClick={() => setCurrentImageIndex(idx)}
+                      style={{
+                        objectFit: "cover",
+                        cursor: "pointer",
+                        border:
+                          currentImageIndex === idx
+                            ? "2px solid #FF8C00"
+                            : "2px solid transparent",
+                        opacity: currentImageIndex === idx ? 1 : 0.5,
+                        transition: "all 0.2s ease",
+                      }}
+                    />
+                  ))}
+                </Group>
+              </Box>
+            )}
+          </>
         )}
       </Modal>
     </Box>

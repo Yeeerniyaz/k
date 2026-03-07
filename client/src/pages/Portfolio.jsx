@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Title,
   Text,
@@ -33,6 +33,10 @@ import {
   IconSearch,
   IconFilter,
   IconArrowsSort,
+  IconZoomIn,
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 
 // 🔥 Senior Update: Импортируем готовые методы из нового axios.js
@@ -65,11 +69,17 @@ export default function Portfolio() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
 
-  // 🔥 SENIOR UPDATE: Массив для хранения нескольких файлов вместо одного
+  // Массив для хранения нескольких файлов
   const [files, setFiles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Категории (используем те же, что и на витрине)
+  // ==========================================
+  // СОСТОЯНИЯ FULLSCREEN LIGHTBOX (ПРОСМОТР)
+  // ==========================================
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Категории
   const categoryOptions = [
     { value: "banners", label: "Баннеры" },
     { value: "lightboxes", label: "Лайтбоксы" },
@@ -86,12 +96,10 @@ export default function Portfolio() {
     try {
       setLoading(true);
       setError(null);
-      // Используем метод из axios.js
       const response = await apiFetchPortfolio();
       setItems(response.data?.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки портфолио:", err);
-      // Убираем фейковые данные. Пустой массив при ошибке.
       setItems([]);
       setError(
         "Не удалось загрузить список работ. Проверьте соединение с сервером.",
@@ -101,7 +109,6 @@ export default function Portfolio() {
     }
   };
 
-  // Первичная загрузка данных при открытии страницы
   useEffect(() => {
     fetchPortfolio();
   }, []);
@@ -111,12 +118,10 @@ export default function Portfolio() {
   // ==========================================
   const processedItems = [...items]
     .filter((item) => {
-      // 1. Поиск по названию или описанию
       const searchString =
         `${item.title || ""} ${item.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchTerm.toLowerCase());
 
-      // 2. Фильтр по категории (нормализуем на случай разницы в регистре из БД)
       const itemCat = item.category?.toLowerCase().replace("_", "-");
       const matchesCategory =
         filterCategory === "ALL" ? true : itemCat === filterCategory;
@@ -124,7 +129,6 @@ export default function Portfolio() {
       return matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
-      // 3. Сортировка
       if (sortBy === "NEWEST")
         return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       if (sortBy === "OLDEST")
@@ -137,42 +141,32 @@ export default function Portfolio() {
     });
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ДОБАВЛЕНИЕ НОВОЙ РАБОТЫ (REAL DATA)
+  // БИЗНЕС-ЛОГИКА: ДОБАВЛЕНИЕ НОВОЙ РАБОТЫ
   // ==========================================
   const handleCreate = async (e) => {
     e.preventDefault();
-    // Проверка: обязательно название, категория и минимум 1 файл
     if (!title || !category || files.length === 0) return;
 
     setIsSubmitting(true);
-
-    // Для отправки файлов используем FormData
     const formData = new FormData();
     formData.append("title", title);
     formData.append("category", category);
     formData.append("description", description);
 
-    // 🔥 SENIOR UPDATE: Добавляем каждый выбранный файл в FormData с общим ключом 'images'
     files.forEach((file) => {
       formData.append("images", file);
     });
 
     try {
-      // Отправляем мультипарт-запрос через функцию axios.js
       await apiAddPortfolio(formData);
-
-      // Очищаем форму и закрываем модалку
       setTitle("");
       setCategory("");
       setDescription("");
       setFiles([]);
       close();
-
-      // Обновляем список работ напрямую с сервера
       fetchPortfolio();
     } catch (err) {
       console.error("Ошибка при создании работы:", err);
-      // Показываем реальную ошибку с бэкенда
       alert(
         err.response?.data?.message ||
           "Ошибка при загрузке работы в облако. Возможно, файлы слишком большие.",
@@ -183,7 +177,7 @@ export default function Portfolio() {
   };
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ РАБОТЫ (REAL DATA)
+  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ РАБОТЫ
   // ==========================================
   const handleDelete = async (id) => {
     if (
@@ -193,7 +187,6 @@ export default function Portfolio() {
 
     try {
       await apiDeletePortfolioItem(id);
-      // Локально удаляем из стейта, только после того как сервер ответил 200 OK
       setItems((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
@@ -205,29 +198,66 @@ export default function Portfolio() {
   };
 
   // ==========================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (ЛАЙТБОКС И ИЗОБРАЖЕНИЯ)
   // ==========================================
-  // Красивое название категории
   const getCategoryLabel = (val) => {
     const normalizedVal = val?.toLowerCase().replace("_", "-");
     const cat = categoryOptions.find((c) => c.value === normalizedVal);
     return cat ? cat.label : val;
   };
 
-  // 🔥 Извлекаем обложку (поддерживает и старый imageUrl, и новый массив imageUrls)
   const getCoverImage = (item) => {
     if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
     if (item.imageUrl) return item.imageUrl;
     return null;
   };
 
-  // Считаем общее количество картинок в проекте
-  const getAllImagesCount = (item) => {
-    if (item.imageUrls && item.imageUrls.length > 0)
-      return item.imageUrls.length;
-    if (item.imageUrl) return 1;
-    return 0;
+  const getAllImages = (item) => {
+    if (!item) return [];
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
+    if (item.imageUrl) return [item.imageUrl];
+    return [];
   };
+
+  const getAllImagesCount = (item) => {
+    return getAllImages(item).length;
+  };
+
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setCurrentImageIndex(0);
+  };
+
+  const closeLightbox = () => {
+    setSelectedItem(null);
+  };
+
+  const lightboxImages = getAllImages(selectedItem);
+
+  const handleNext = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev === lightboxImages.length - 1 ? 0 : prev + 1,
+    );
+  }, [lightboxImages.length]);
+
+  const handlePrev = useCallback(() => {
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? lightboxImages.length - 1 : prev - 1,
+    );
+  }, [lightboxImages.length]);
+
+  // Управление с клавиатуры в лайтбоксе
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!selectedItem) return;
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "Escape") closeLightbox();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedItem, handleNext, handlePrev]);
 
   return (
     <div style={{ fontFamily: '"Google Sans", sans-serif' }}>
@@ -355,14 +385,36 @@ export default function Portfolio() {
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
+                    cursor: "pointer", // Указываем, что карточка кликабельна
+                    transition: "transform 0.2s ease, box-shadow 0.2s ease",
                   }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.boxShadow =
+                      "0 8px 16px rgba(0,0,0,0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow =
+                      "var(--mantine-shadow-sm)";
+                  }}
+                  onClick={() => handleItemClick(item)} // Открываем лайтбокс при клике
                 >
-                  <Card.Section style={{ position: "relative" }}>
+                  <Card.Section
+                    style={{ position: "relative", overflow: "hidden" }}
+                  >
                     <Image
                       src={getCoverImage(item)}
                       height={200}
                       alt={item.title}
                       fallbackSrc="https://placehold.co/600x400?text=Нет+Изображения"
+                      style={{ transition: "transform 0.4s ease" }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform = "scale(1.05)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
                     />
                     <Badge
                       variant="filled"
@@ -376,7 +428,21 @@ export default function Portfolio() {
                       {getCategoryLabel(item.category)}
                     </Badge>
 
-                    {/* Если картинок больше 1, показываем индикатор в админке */}
+                    {/* Иконка лупы по центру при наведении (опционально, для красоты) */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 10,
+                        left: 10,
+                        backgroundColor: "rgba(0,0,0,0.5)",
+                        borderRadius: "50%",
+                        padding: "6px",
+                        display: "flex",
+                      }}
+                    >
+                      <IconZoomIn color="white" size={16} />
+                    </div>
+
                     {imgCount > 1 && (
                       <Badge
                         variant="white"
@@ -417,7 +483,10 @@ export default function Portfolio() {
                     mt="md"
                     radius="md"
                     leftSection={<IconTrash size={16} />}
-                    onClick={() => handleDelete(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // ВАЖНО: останавливаем клик, чтобы не открылся лайтбокс
+                      handleDelete(item.id);
+                    }}
                   >
                     Удалить
                   </Button>
@@ -499,7 +568,6 @@ export default function Portfolio() {
               styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
             />
 
-            {/* 🔥 SENIOR UPDATE: FileInput теперь поддерживает Multiple файлов */}
             <FileInput
               label="Фотографии работы (можно выбрать несколько)"
               placeholder="Нажмите, чтобы выбрать файлы (до 10 шт)"
@@ -536,6 +604,159 @@ export default function Portfolio() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      {/* ========================================== */}
+      {/* FULLSCREEN LIGHTBOX (ПРОСМОТР ФОТО) */}
+      {/* ========================================== */}
+      <Modal
+        opened={!!selectedItem}
+        onClose={closeLightbox}
+        fullScreen
+        withCloseButton={false}
+        transitionProps={{ transition: "fade", duration: 250 }}
+        styles={{
+          inner: { padding: 0 },
+          content: { backgroundColor: "#0f0f0f", color: "white" },
+          body: {
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            padding: 0,
+          },
+        }}
+      >
+        {selectedItem && (
+          <>
+            {/* ВЕРХНЯЯ ПАНЕЛЬ: Заголовок и закрытие */}
+            <Group
+              justify="space-between"
+              align="flex-start"
+              p="md"
+              style={{ flexShrink: 0 }}
+            >
+              <Box style={{ maxWidth: "80%" }}>
+                <Title order={3} style={{ color: "white" }} lineClamp={1}>
+                  {selectedItem.title}
+                </Title>
+                <Text size="sm" style={{ color: "rgba(255,255,255,0.7)" }}>
+                  {getCategoryLabel(selectedItem.category)}
+                </Text>
+              </Box>
+              <ActionIcon
+                onClick={closeLightbox}
+                size="xl"
+                variant="transparent"
+                style={{ color: "white" }}
+              >
+                <IconX size={32} />
+              </ActionIcon>
+            </Group>
+
+            {/* ЦЕНТРАЛЬНАЯ ЗОНА: Основное фото и стрелки */}
+            <Box
+              style={{
+                flexGrow: 1,
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                padding: "0 16px",
+              }}
+            >
+              {lightboxImages.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrev();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronLeft size={40} />
+                </ActionIcon>
+              )}
+
+              <Image
+                src={lightboxImages[currentImageIndex]}
+                alt={selectedItem.title}
+                fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
+                style={{
+                  maxHeight: "80vh",
+                  maxWidth: "100%",
+                  objectFit: "contain",
+                  transition: "opacity 0.2s ease",
+                }}
+              />
+
+              {lightboxImages.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNext();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronRight size={40} />
+                </ActionIcon>
+              )}
+            </Box>
+
+            {/* НИЖНЯЯ ПАНЕЛЬ: Миниатюры (показываем, если картинок больше 1) */}
+            {lightboxImages.length > 1 && (
+              <Box
+                style={{
+                  flexShrink: 0,
+                  padding: "16px",
+                  overflowX: "auto",
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <Group gap="sm" style={{ flexWrap: "nowrap" }}>
+                  {lightboxImages.map((imgUrl, idx) => (
+                    <Image
+                      key={idx}
+                      src={imgUrl}
+                      w={60}
+                      h={60}
+                      radius="md"
+                      onClick={() => setCurrentImageIndex(idx)}
+                      style={{
+                        objectFit: "cover",
+                        cursor: "pointer",
+                        border:
+                          currentImageIndex === idx
+                            ? "2px solid #FF8C00"
+                            : "2px solid transparent",
+                        opacity: currentImageIndex === idx ? 1 : 0.5,
+                        transition: "all 0.2s ease",
+                      }}
+                    />
+                  ))}
+                </Group>
+              </Box>
+            )}
+          </>
+        )}
       </Modal>
     </div>
   );
