@@ -1,5 +1,4 @@
-import { prisma } from '../server.js'; // Сеньорский подход: используем единый пул соединений с БД
-// 🔥 СЕНЬОРСКИЕ УТИЛИТЫ:
+import { prisma } from '../server.js';
 import { catchAsync } from '../utils/catchAsync.js';
 import { AppError } from '../utils/AppError.js';
 
@@ -8,10 +7,10 @@ import { AppError } from '../utils/AppError.js';
 // ==========================================
 export const getExpenses = catchAsync(async (req, res, next) => {
     // Получаем только те расходы, которые НЕ привязаны к конкретному заказу (orderId: null)
-    // Это и есть общие операционные расходы фирмы (Аренда, Зарплата, Реклама и т.д.)
+    // Это общие операционные расходы (Аренда, Зарплата, Реклама Royal Banners и т.д.)
     const expenses = await prisma.expense.findMany({
         where: {
-            orderId: null 
+            orderId: null
         },
         orderBy: {
             date: 'desc' // Свежие транзакции сверху

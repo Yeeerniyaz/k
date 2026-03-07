@@ -27,9 +27,9 @@ import {
   IconRefresh,
   IconEdit,
   IconReportMoney,
-  IconDatabase,
   IconSearch,
   IconArrowsSort,
+  IconTags,
 } from "@tabler/icons-react";
 
 // 🔥 Senior Update: Импортируем готовые методы из нового axios.js
@@ -75,7 +75,7 @@ export default function Prices() {
       setError(null);
       // Используем метод из axios.js
       const response = await apiFetchPrices();
-      // Поддержка различных форматов ответа
+      // Поддержка различных форматов ответа с бэкенда
       const data = response.data?.data || response.data || [];
       setPrices(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -157,7 +157,7 @@ export default function Prices() {
       fetchPrices();
     } catch (err) {
       console.error("Ошибка при сохранении:", err);
-      // 🔥 Senior Update: Убрана локальная имитация. Выводим реальную ошибку сервера.
+      // 🔥 Выводим реальную ошибку сервера
       alert(
         err.response?.data?.message ||
           "Ошибка при сохранении позиции. Возможно, такая услуга уже существует.",
@@ -173,7 +173,7 @@ export default function Prices() {
   const handleDelete = async (id) => {
     if (
       !window.confirm(
-        "Вы уверены, что хотите удалить эту позицию из прайса? Это может повлиять на калькулятор!",
+        "Вы уверены, что хотите удалить эту позицию из прайса? Это напрямую повлияет на онлайн-калькулятор на сайте!",
       )
     )
       return;
@@ -184,7 +184,6 @@ export default function Prices() {
       setPrices((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
-      // 🔥 Senior Update: Убрана локальная имитация удаления.
       alert(
         err.response?.data?.message ||
           "Не удалось удалить позицию. Убедитесь, что у вас есть права Администратора.",
@@ -199,13 +198,17 @@ export default function Prices() {
       {/* ========================================== */}
       <Group justify="space-between" mb="xl">
         <div>
-          <Group gap="xs" mb="xs">
-            <IconDatabase size={24} color="#1B2E3D" />
-            <Title order={2} style={{ color: "#1B2E3D" }}>
-              Управление Прайс-листом
-            </Title>
-          </Group>
-          <Text c="dimmed">База данных для калькулятора и менеджеров</Text>
+          <Title order={2} style={{ color: "#1B2E3D" }}>
+            <IconTags
+              size={26}
+              color="#FF8C00"
+              style={{ verticalAlign: "bottom", marginRight: "8px" }}
+            />
+            Прайс-лист
+          </Title>
+          <Text c="dimmed" mt={5}>
+            База цен на материалы и услуги для калькулятора Royal Banners
+          </Text>
         </div>
 
         <Group>
@@ -227,7 +230,12 @@ export default function Prices() {
               backgroundColor: "#1B2E3D",
               color: "white",
               fontWeight: 600,
+              transition: "transform 0.2s",
             }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.transform = "scale(1.02)")
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
             Добавить позицию
           </Button>
@@ -254,7 +262,7 @@ export default function Prices() {
           <Grid.Col span={{ base: 12, md: 6 }}>
             <TextInput
               label="Поиск по прайс-листу"
-              placeholder="Название услуги или материала..."
+              placeholder="Название услуги или материала (например: Оракал)..."
               leftSection={<IconSearch size={16} />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.currentTarget.value)}
@@ -371,7 +379,7 @@ export default function Prices() {
               Прайс-лист пуст
             </Text>
             <Text c="dimmed" mt={5}>
-              Добавьте новые услуги или проверьте фильтры.
+              Добавьте новые услуги, чтобы калькулятор на сайте заработал.
             </Text>
             <Group mt="md">
               <Button
@@ -384,7 +392,7 @@ export default function Prices() {
                 Сбросить фильтры
               </Button>
               <Button
-                style={{ backgroundColor: "#1B2E3D" }}
+                style={{ backgroundColor: "#FF8C00", color: "#1B2E3D" }}
                 onClick={() => handleOpenModal()}
               >
                 Добавить услугу
@@ -402,7 +410,7 @@ export default function Prices() {
         onClose={close}
         title={
           <Title order={3} style={{ color: "#1B2E3D" }}>
-            {editingId ? "Редактировать услугу" : "Новая услуга"}
+            {editingId ? "Редактировать позицию" : "Новая позиция в прайс"}
           </Title>
         }
         size="md"
@@ -412,8 +420,8 @@ export default function Prices() {
         <form onSubmit={handleSave}>
           <Stack gap="md">
             <TextInput
-              label="Наименование услуги"
-              placeholder="Например: Объемные световые буквы"
+              label="Наименование услуги / материала"
+              placeholder="Например: Печать баннера 440 гр."
               required
               value={service}
               onChange={(e) => setService(e.currentTarget.value)}
@@ -422,7 +430,7 @@ export default function Prices() {
 
             <TextInput
               label="Единица измерения"
-              placeholder="1 кв.м, 1 шт., 1 см высоты"
+              placeholder="1 кв.м, 1 шт., 1 п.м."
               required
               value={unit}
               onChange={(e) => setUnit(e.currentTarget.value)}
@@ -449,7 +457,11 @@ export default function Prices() {
               <Button
                 type="submit"
                 loading={isSubmitting}
-                style={{ backgroundColor: "#1B2E3D" }}
+                style={{
+                  backgroundColor: "#FF8C00",
+                  color: "#1B2E3D",
+                  fontWeight: 700,
+                }}
               >
                 {editingId ? "Сохранить изменения" : "Добавить в прайс"}
               </Button>
