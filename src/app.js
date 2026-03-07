@@ -13,6 +13,7 @@ import priceRoutes from './routes/price.routes.js';
 import portfolioRoutes from './routes/portfolio.routes.js';
 import financeRoutes from './routes/finance.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
 
 // 🔥 СЕНЬОРСКОЕ ДОБАВЛЕНИЕ: Импортируем наш глобальный перехватчик ошибок
 import { errorHandler } from './middlewares/error.middleware.js';
@@ -66,6 +67,7 @@ app.use('/api/prices', priceRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ==========================================
 // 3. РАЗДАЧА FRONTEND (REACT CLIENT)
