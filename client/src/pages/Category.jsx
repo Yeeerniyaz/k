@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Container,
@@ -27,6 +27,9 @@ import {
   IconPhotoOff,
   IconArrowUp,
   IconPhoto,
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 
 // 🔥 Senior Update: Импортируем метод из нового единого axios.js
@@ -77,9 +80,9 @@ export default function Category() {
   // ==========================================
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // Обработка ошибок для пользователей
+  const [error, setError] = useState(null);
 
-  // Состояния для Lightbox (увеличенного просмотра с галереей)
+  // Состояния для Fullscreen Lightbox (галерея)
   const [selectedItem, setSelectedItem] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -91,12 +94,10 @@ export default function Category() {
       try {
         setLoading(true);
         setError(null);
-        // Используем метод из axios.js
         const response = await fetchPortfolio();
         const allItems = response.data.data || response.data || [];
 
-        // Фильтруем работы, оставляем только те, что относятся к текущей категории
-        // Нормализуем строку (заменяем _ на - и делаем lowercase)
+        // Фильтруем работы для текущей категории
         const filteredItems = allItems.filter((item) => {
           const itemCat = item.category?.toLowerCase().replace("_", "-");
           return itemCat === id;
@@ -117,25 +118,52 @@ export default function Category() {
   }, [id]);
 
   // ==========================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И НАВИГАЦИЯ ЛАЙТБОКСА
   // ==========================================
   const handleItemClick = (item) => {
     setSelectedItem(item);
-    setCurrentImageIndex(0); // Сбрасываем индекс при открытии новой работы
+    setCurrentImageIndex(0);
   };
 
-  // Извлекаем обложку (совместимо со старым форматом imageUrl и новым imageUrls)
+  const closeLightbox = () => {
+    setSelectedItem(null);
+  };
+
+  const getAllImages = (item) => {
+    if (!item) return [];
+    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
+    if (item.imageUrl) return [item.imageUrl];
+    return [];
+  };
+
+  const images = getAllImages(selectedItem);
+
+  const handleNext = useCallback(() => {
+    setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  }, [images.length]);
+
+  const handlePrev = useCallback(() => {
+    setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  }, [images.length]);
+
+  // 🔥 SENIOR FEATURE: Поддержка перелистывания с клавиатуры
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!selectedItem) return;
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "Escape") closeLightbox();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedItem, handleNext, handlePrev]);
+
+  // Извлекаем обложку для карточки
   const getCoverImage = (item) => {
     if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
     if (item.imageUrl) return item.imageUrl;
     return null;
-  };
-
-  // Извлекаем все картинки (нормализуем в массив)
-  const getAllImages = (item) => {
-    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
-    if (item.imageUrl) return [item.imageUrl];
-    return [];
   };
 
   return (
@@ -296,7 +324,6 @@ export default function Category() {
                         }
                       />
 
-                      {/* 🔥 SENIOR ФИЧА: Если картинок больше одной, показываем счетчик */}
                       {allImages.length > 1 && (
                         <Badge
                           variant="white"
@@ -375,110 +402,156 @@ export default function Category() {
       </Container>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА КАРТИНКИ (LIGHTBOX С ГАЛЕРЕЕЙ) */}
+      {/* 🔥 SENIOR LIGHTBOX: ПРЕМИАЛЬНЫЙ ПРОСМОТР ФОТО */}
       {/* ========================================== */}
       <Modal
         opened={!!selectedItem}
-        onClose={() => setSelectedItem(null)}
-        size="auto"
-        centered
+        onClose={closeLightbox}
+        fullScreen
         withCloseButton={false}
-        overlayProps={{ backgroundOpacity: 0.8, blur: 5 }}
+        transitionProps={{ transition: "fade", duration: 250 }}
         styles={{
-          content: { backgroundColor: "transparent", boxShadow: "none" },
-          body: { padding: 0 },
+          inner: { padding: 0 },
+          content: { backgroundColor: "#0f0f0f", color: "white" },
+          body: {
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            padding: 0,
+          },
         }}
       >
         {selectedItem && (
-          <div
-            style={{
-              position: "relative",
-              maxWidth: "90vw",
-              maxHeight: "90vh",
-            }}
-          >
-            {/* Главное изображение */}
-            <Image
-              src={getAllImages(selectedItem)[currentImageIndex]}
-              alt={selectedItem.title}
-              fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
-              style={{
-                maxHeight: "75vh",
-                objectFit: "contain",
-                borderRadius: "8px",
-                transition: "opacity 0.2s ease-in-out",
-              }}
-            />
-
-            {/* Галерея Thumbnails */}
-            {getAllImages(selectedItem).length > 1 && (
-              <Group mt="sm" justify="center" gap="xs">
-                {getAllImages(selectedItem).map((imgUrl, idx) => (
-                  <Image
-                    key={idx}
-                    src={imgUrl}
-                    w={60}
-                    h={60}
-                    radius="md"
-                    onClick={() => setCurrentImageIndex(idx)}
-                    style={{
-                      objectFit: "cover",
-                      cursor: "pointer",
-                      border:
-                        currentImageIndex === idx
-                          ? "3px solid #FF8C00"
-                          : "2px solid transparent",
-                      opacity: currentImageIndex === idx ? 1 : 0.6,
-                      transition: "all 0.2s ease",
-                      backgroundColor: "white",
-                    }}
-                  />
-                ))}
-              </Group>
-            )}
-
-            <div
-              style={{
-                position: "absolute",
-                bottom: getAllImages(selectedItem).length > 1 ? 80 : 0,
-                left: 0,
-                right: 0,
-                background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-                padding: "20px",
-                borderBottomLeftRadius: "8px",
-                borderBottomRightRadius: "8px",
-              }}
+          <>
+            {/* ВЕРХНЯЯ ПАНЕЛЬ: Заголовок и кнопка закрытия */}
+            <Group
+              justify="space-between"
+              align="flex-start"
+              p="md"
+              style={{ flexShrink: 0 }}
             >
-              <Title order={3} style={{ color: "white" }}>
-                {selectedItem.title}
-              </Title>
-              {selectedItem.description && (
-                <Text
-                  size="sm"
-                  style={{ color: "rgba(255,255,255,0.8)" }}
-                  mt="xs"
-                >
+              <Box style={{ maxWidth: "80%" }}>
+                <Title order={3} style={{ color: "white" }} lineClamp={1}>
+                  {selectedItem.title}
+                </Title>
+                <Text size="sm" style={{ color: "rgba(255,255,255,0.7)" }}>
                   {selectedItem.description}
                 </Text>
-              )}
-            </div>
-            <Button
-              variant="filled"
-              color="dark"
+              </Box>
+              <ActionIcon
+                onClick={closeLightbox}
+                size="xl"
+                variant="transparent"
+                color="gray"
+                style={{ color: "white" }}
+              >
+                <IconX size={32} />
+              </ActionIcon>
+            </Group>
+
+            {/* ЦЕНТРАЛЬНАЯ ЗОНА: Основное изображение и стрелки */}
+            <Box
               style={{
-                position: "absolute",
-                top: 10,
-                right: 10,
-                borderRadius: "50%",
+                flexGrow: 1,
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                padding: "0 16px",
               }}
-              w={40}
-              h={40}
-              p={0}
-              onClick={() => setSelectedItem(null)}
             >
-              ✕
-            </Button>
-          </div>
+              {images.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrev();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronLeft size={40} />
+                </ActionIcon>
+              )}
+
+              <Image
+                src={images[currentImageIndex]}
+                alt={selectedItem.title}
+                fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
+                style={{
+                  maxHeight: "80vh",
+                  maxWidth: "100%",
+                  objectFit: "contain",
+                  transition: "opacity 0.2s ease",
+                }}
+              />
+
+              {images.length > 1 && (
+                <ActionIcon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNext();
+                  }}
+                  size="xl"
+                  variant="transparent"
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    zIndex: 10,
+                    color: "white",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <IconChevronRight size={40} />
+                </ActionIcon>
+              )}
+            </Box>
+
+            {/* НИЖНЯЯ ПАНЕЛЬ: Лента миниатюр */}
+            {images.length > 1 && (
+              <Box
+                style={{
+                  flexShrink: 0,
+                  padding: "16px",
+                  overflowX: "auto",
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <Group gap="sm" style={{ flexWrap: "nowrap" }}>
+                  {images.map((imgUrl, idx) => (
+                    <Image
+                      key={idx}
+                      src={imgUrl}
+                      w={60}
+                      h={60}
+                      radius="md"
+                      onClick={() => setCurrentImageIndex(idx)}
+                      style={{
+                        objectFit: "cover",
+                        cursor: "pointer",
+                        border:
+                          currentImageIndex === idx
+                            ? "2px solid #FF8C00"
+                            : "2px solid transparent",
+                        opacity: currentImageIndex === idx ? 1 : 0.5,
+                        transition: "all 0.2s ease",
+                      }}
+                    />
+                  ))}
+                </Group>
+              </Box>
+            )}
+          </>
         )}
       </Modal>
     </div>

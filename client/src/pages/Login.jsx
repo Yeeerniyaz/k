@@ -61,8 +61,10 @@ export default function Login() {
           localStorage.setItem('user', JSON.stringify(user));
         }
 
-        // 🔥 FIX: Направляем строго в защищенную зону (Админку)
-        navigate('/admin');
+        // 🔥 SENIOR FIX: Поскольку в App.jsx нет глобального стейта (Context/Redux),
+        // обычный navigate() не заставит App.jsx заново прочитать localStorage.
+        // Поэтому делаем жесткий редирект, чтобы приложение инициализировалось заново.
+        window.location.href = '/admin';
       } else {
         throw new Error('Некорректный ответ сервера. Токен не получен.');
       }
