@@ -26,8 +26,8 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
-// Импортируем готовый метод из axios.js
-import { fetchPortfolio as apiFetchPortfolio } from "../api/axios.js";
+// 🔥 SENIOR FIX: Импортируем API_URL чтобы обращаться к нашему VPS прокси
+import { fetchPortfolio as apiFetchPortfolio, API_URL } from "../api/axios.js";
 
 export default function PublicPortfolio() {
   const navigate = useNavigate();
@@ -39,14 +39,11 @@ export default function PublicPortfolio() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ФИЛЬТРАЦИЯ
   const [activeCategory, setActiveCategory] = useState("ALL");
 
-  // ПРОСМОТР ПРОЕКТА (FULLSCREEN LIGHTBOX)
   const [selectedItem, setSelectedItem] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Категории для красивого отображения клиентам
   const categories = [
     { value: "ALL", label: "Все работы" },
     { value: "banners", label: "Баннеры" },
@@ -58,7 +55,7 @@ export default function PublicPortfolio() {
   ];
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА РАБОТ (REAL DATA)
+  // БИЗНЕС-ЛОГИКА
   // ==========================================
   const fetchPortfolio = async () => {
     try {
@@ -80,7 +77,7 @@ export default function PublicPortfolio() {
   }, []);
 
   // ==========================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ЛАЙТБОКС
+  // 🔥 СЕНЬОРСКИЕ ФУНКЦИИ (ПРОКСИРОВАНИЕ ФОТО)
   // ==========================================
   const getCategoryLabel = (val) => {
     const cat = categories.find(
@@ -90,16 +87,27 @@ export default function PublicPortfolio() {
   };
 
   const getCoverImage = (item) => {
-    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls[0];
-    if (item.imageUrl) return item.imageUrl;
+    let url = null;
+    if (item.imageUrls && item.imageUrls.length > 0) url = item.imageUrls[0];
+    else if (item.imageUrl) url = item.imageUrl;
+
+    if (url) {
+      // 🔥 Пропускаем через наш VPS сервер, обходя блокировки Теле2/Kcell!
+      return `${API_URL}/portfolio/proxy?url=${encodeURIComponent(url)}`;
+    }
     return null;
   };
 
   const getAllImages = (item) => {
     if (!item) return [];
-    if (item.imageUrls && item.imageUrls.length > 0) return item.imageUrls;
-    if (item.imageUrl) return [item.imageUrl];
-    return [];
+    let urls = [];
+    if (item.imageUrls && item.imageUrls.length > 0) urls = item.imageUrls;
+    else if (item.imageUrl) urls = [item.imageUrl];
+
+    // 🔥 Пропускаем все фото через прокси
+    return urls.map(
+      (url) => `${API_URL}/portfolio/proxy?url=${encodeURIComponent(url)}`,
+    );
   };
 
   const handleItemClick = (item) => {
@@ -125,7 +133,6 @@ export default function PublicPortfolio() {
     );
   }, [lightboxImages.length]);
 
-  // Поддержка управления с клавиатуры
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!selectedItem) return;
@@ -138,7 +145,6 @@ export default function PublicPortfolio() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedItem, handleNext, handlePrev]);
 
-  // Фильтруем и сортируем (свежие сверху)
   const filteredItems = items
     .filter((item) => {
       if (activeCategory === "ALL") return true;
@@ -156,9 +162,6 @@ export default function PublicPortfolio() {
         fontFamily: '"Google Sans", sans-serif',
       }}
     >
-      {/* ========================================== */}
-      {/* ШАПКА ПОРТФОЛИО */}
-      {/* ========================================== */}
       <Box
         bg="white"
         pt={60}
@@ -199,9 +202,6 @@ export default function PublicPortfolio() {
         </Container>
       </Box>
 
-      {/* ========================================== */}
-      {/* ФИЛЬТРЫ КАТЕГОРИЙ */}
-      {/* ========================================== */}
       <Container size="lg" mt={40}>
         {error && (
           <Center mb="xl">
@@ -232,9 +232,6 @@ export default function PublicPortfolio() {
           ))}
         </Group>
 
-        {/* ========================================== */}
-        {/* СЕТКА ПРОЕКТОВ */}
-        {/* ========================================== */}
         {loading ? (
           <Grid gutter="xl">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -282,7 +279,7 @@ export default function PublicPortfolio() {
                         src={coverImage}
                         height={280}
                         alt={item.title}
-                        fallbackSrc="https://placehold.co/600x400?text=Изображение+не+найдено"
+                        fallbackSrc="https://placehold.co/600x400?text=Загрузка..."
                         style={{ transition: "transform 0.5s ease" }}
                         onMouseEnter={(e) =>
                           (e.currentTarget.style.transform = "scale(1.05)")
@@ -370,7 +367,6 @@ export default function PublicPortfolio() {
             </Title>
             <Text c="dimmed" mt="xs" maw={400}>
               Возможно, мы еще не успели загрузить фотографии новых объектов.
-              Попробуйте выбрать другую категорию.
             </Text>
             <Button
               mt="xl"
@@ -383,9 +379,6 @@ export default function PublicPortfolio() {
         )}
       </Container>
 
-      {/* ========================================== */}
-      {/* FULLSCREEN LIGHTBOX (ПРЕМИАЛЬНЫЙ ПРОСМОТР) */}
-      {/* ========================================== */}
       <Modal
         opened={!!selectedItem}
         onClose={closeLightbox}
@@ -396,8 +389,6 @@ export default function PublicPortfolio() {
           inner: { padding: 0 },
           content: { backgroundColor: "#0f0f0f", color: "white" },
           body: {
-            // 🔥 SENIOR BUGFIX ДЛЯ IPHONE SAFARI:
-            // Используем 100dvh (dynamic viewport height), чтобы адресная строка не закрывала контент
             height: "100dvh",
             display: "flex",
             flexDirection: "column",
@@ -407,7 +398,6 @@ export default function PublicPortfolio() {
       >
         {selectedItem && (
           <>
-            {/* ВЕРХНЯЯ ПАНЕЛЬ: Заголовок и закрытие */}
             <Group
               justify="space-between"
               align="flex-start"
@@ -442,11 +432,8 @@ export default function PublicPortfolio() {
               </ActionIcon>
             </Group>
 
-            {/* ЦЕНТРАЛЬНАЯ ЗОНА: Основное фото и стрелки */}
             <Box
               style={{
-                // 🔥 SENIOR BUGFIX ДЛЯ IPHONE SAFARI:
-                // minHeight: 0 решает баг схлопывания флексбоксов, когда картинка исчезала.
                 flex: 1,
                 minHeight: 0,
                 position: "relative",
@@ -478,11 +465,10 @@ export default function PublicPortfolio() {
                 </ActionIcon>
               )}
 
-              {/* 🔥 Используем жесткие параметры отображения картинки, чтобы Safari не тупил */}
               <Image
                 src={lightboxImages[currentImageIndex]}
                 alt={selectedItem.title}
-                fallbackSrc="https://placehold.co/800x600?text=Ошибка+загрузки"
+                fallbackSrc="https://placehold.co/800x600?text=Загрузка..."
                 h="100%"
                 w="100%"
                 fit="contain"
@@ -511,7 +497,6 @@ export default function PublicPortfolio() {
               )}
             </Box>
 
-            {/* НИЖНЯЯ ПАНЕЛЬ: Миниатюры */}
             {lightboxImages.length > 1 && (
               <Box
                 style={{
