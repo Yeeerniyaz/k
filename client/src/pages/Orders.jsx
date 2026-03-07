@@ -19,6 +19,8 @@ import {
   Divider,
   TextInput,
   Grid,
+  Textarea,
+  ThemeIcon,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -32,10 +34,11 @@ import {
   IconSearch,
   IconFilter,
   IconArrowsSort,
+  IconShoppingCart,
 } from "@tabler/icons-react";
 
-// 🔥 Senior Update: Импортируем методы из нашего нового единого axios.js
-import {
+// 🔥 Senior Update: Импортируем базовый API и методы из axios.js
+import api, {
   fetchOrders as apiFetchOrders,
   updateOrder as apiUpdateOrder,
   deleteOrder as apiDeleteOrder,
@@ -57,22 +60,38 @@ export default function Orders() {
   const [sortBy, setSortBy] = useState("DATE_DESC");
 
   // ==========================================
-  // СОСТОЯНИЯ МОДАЛЬНОГО ОКНА (РЕДАКТИРОВАНИЕ)
+  // СОСТОЯНИЯ МОДАЛКИ: СОЗДАНИЕ НОВОГО ЗАКАЗА
   // ==========================================
-  const [opened, { open, close }] = useDisclosure(false);
-  const [editingOrder, setEditingOrder] = useState(null);
+  const [openedCreate, { open: openCreate, close: closeCreate }] =
+    useDisclosure(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    customerName: "",
+    phone: "",
+    serviceType: "BANNERS", // Базовое значение Enum для Prisma
+    description: "",
+    totalPrice: 0,
+  });
 
-  // Поля управления заказом
+  // ==========================================
+  // СОСТОЯНИЯ МОДАЛКИ: РЕДАКТИРОВАНИЕ ЗАКАЗА
+  // ==========================================
+  const [openedEdit, { open: openEdit, close: closeEdit }] =
+    useDisclosure(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Поля управления заказом (статус и финансы)
   const [status, setStatus] = useState("NEW");
   const [price, setPrice] = useState(0);
 
-  // Поля для расходов по заказу
+  // Поля для расходов по заказу (себестоимость)
   const [orderExpenses, setOrderExpenses] = useState([]);
-  const [expenseCategory, setExpenseCategory] = useState("Материалы");
+  const [expenseCategory, setExpenseCategory] = useState(
+    "Материалы (Акрил, ПВХ, Пленка)",
+  );
   const [expenseAmount, setExpenseAmount] = useState(0);
   const [expenseComment, setExpenseComment] = useState("");
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==========================================
   // БИЗНЕС-ЛОГИКА: ЗАГРУЗКА ЗАКАЗОВ (REAL DATA)
@@ -81,12 +100,10 @@ export default function Orders() {
     try {
       setLoading(true);
       setError(null);
-      // 🔥 Используем метод из axios.js
       const response = await apiFetchOrders();
-      setOrders(response.data.data || response.data || []);
+      setOrders(response.data?.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки заказов:", err);
-      // 🔥 Senior Practice: Никаких фейковых данных! Если ошибка - массив пуст.
       setOrders([]);
       setError(
         "Не удалось загрузить список заказов. Проверьте соединение с сервером.",
@@ -107,7 +124,7 @@ export default function Orders() {
     .filter((order) => {
       // 1. Поиск по тексту (Имя клиента, ID, Описание/Источник)
       const searchString =
-        `${order.clientName || ""} ${order.id || ""} ${order.description || ""}`.toLowerCase();
+        `${order.customerName || order.clientName || ""} ${order.id || ""} ${order.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchTerm.toLowerCase());
 
       // 2. Фильтр по статусу
@@ -122,27 +139,74 @@ export default function Orders() {
         return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       if (sortBy === "DATE_ASC")
         return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-      if (sortBy === "PRICE_DESC") return (b.price || 0) - (a.price || 0);
-      if (sortBy === "PRICE_ASC") return (a.price || 0) - (b.price || 0);
+      if (sortBy === "PRICE_DESC")
+        return (b.price || b.totalPrice || 0) - (a.price || a.totalPrice || 0);
+      if (sortBy === "PRICE_ASC")
+        return (a.price || a.totalPrice || 0) - (b.price || b.totalPrice || 0);
       return 0;
     });
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ОТКРЫТИЕ МОДАЛКИ
+  // БИЗНЕС-ЛОГИКА: СОЗДАНИЕ НОВОГО ЗАКАЗА (РУЧНОЙ ВВОД)
+  // ==========================================
+  const handleCreateOrder = async (e) => {
+    e.preventDefault();
+    if (!newOrder.customerName || !newOrder.phone) return;
+
+    setIsCreating(true);
+    try {
+      // Отправляем данные на сервер
+      await api.post("/orders", {
+        customerName: newOrder.customerName,
+        phone: newOrder.phone,
+        serviceType: newOrder.serviceType,
+        description:
+          newOrder.description || "Создано вручную менеджером Royal Banners",
+        price: newOrder.totalPrice, // Для совместимости с разными версиями API
+        totalPrice: newOrder.totalPrice,
+        status: "NEW",
+        hasEyelets: false,
+        needsMount: true,
+      });
+
+      // Очищаем форму и закрываем
+      setNewOrder({
+        customerName: "",
+        phone: "",
+        serviceType: "BANNERS",
+        description: "",
+        totalPrice: 0,
+      });
+      closeCreate();
+
+      // Обновляем таблицу
+      fetchOrders();
+    } catch (err) {
+      console.error("Ошибка при создании заявки:", err);
+      alert(
+        err.response?.data?.message ||
+          "Не удалось создать заявку. Проверьте данные.",
+      );
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // ==========================================
+  // БИЗНЕС-ЛОГИКА: ОТКРЫТИЕ МОДАЛКИ РЕДАКТИРОВАНИЯ
   // ==========================================
   const handleEditClick = (order) => {
     setEditingOrder(order);
     setStatus(order.status || "NEW");
-    setPrice(order.price || 0);
-    // Загружаем существующие расходы заказа, если они есть
+    setPrice(order.price || order.totalPrice || 0);
     setOrderExpenses(order.expenses || []);
 
     // Сбрасываем форму добавления расхода
-    setExpenseCategory("Материалы");
+    setExpenseCategory("Материалы (Акрил, ПВХ, Пленка)");
     setExpenseAmount(0);
     setExpenseComment("");
 
-    open();
+    openEdit();
   };
 
   // ==========================================
@@ -169,7 +233,7 @@ export default function Orders() {
     setOrderExpenses(orderExpenses.filter((e) => e.id !== expenseId));
   };
 
-  // Расчет итогов
+  // Расчет итогов для модалки редактирования
   const totalExpenses = orderExpenses.reduce(
     (sum, item) => sum + item.amount,
     0,
@@ -185,19 +249,17 @@ export default function Orders() {
 
     setIsSubmitting(true);
     try {
-      // Отправляем обновленные данные через axios.js
       await apiUpdateOrder(editingOrder.id, {
         status,
         price,
+        totalPrice: price, // Дублируем для обратной совместимости
         expenses: orderExpenses,
       });
 
-      close();
-      // Обновляем список с сервера после успешного сохранения
+      closeEdit();
       fetchOrders();
     } catch (err) {
       console.error("Ошибка при обновлении заказа:", err);
-      // 🔥 Senior Update: Убрана имитация сохранения. Показываем реальную ошибку.
       alert(
         err.response?.data?.message ||
           "Не удалось обновить заказ. Попробуйте позже.",
@@ -218,14 +280,12 @@ export default function Orders() {
 
     try {
       await apiDeleteOrder(id);
-      // Удаляем из локального состояния только после успешного ответа сервера
       setOrders((prev) => prev.filter((order) => order.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
-      // 🔥 Senior Update: Убрана имитация удаления.
       alert(
         err.response?.data?.message ||
-          "Не удалось удалить заказ. Возможно, у вас нет прав Администратора.",
+          "Не удалось удалить заказ. Проверьте права доступа.",
       );
     }
   };
@@ -238,13 +298,25 @@ export default function Orders() {
       case "COMPLETED":
         return (
           <Badge color="green" variant="light">
-            Выполнен
+            Выполнен / Сдан
+          </Badge>
+        );
+      case "READY":
+        return (
+          <Badge color="teal" variant="outline">
+            Готов к монтажу
+          </Badge>
+        );
+      case "IN_PROGRESS":
+        return (
+          <Badge color="violet" variant="light">
+            В производстве
           </Badge>
         );
       case "PENDING":
         return (
           <Badge color="orange" variant="light">
-            В работе
+            Ожидание / Замер
           </Badge>
         );
       case "CANCELED":
@@ -255,8 +327,8 @@ export default function Orders() {
         );
       case "NEW":
         return (
-          <Badge color="blue" variant="light">
-            Новый
+          <Badge color="blue" variant="filled">
+            Новая заявка
           </Badge>
         );
       default:
@@ -285,10 +357,16 @@ export default function Orders() {
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={2} style={{ color: "#1B2E3D" }}>
+            <IconShoppingCart
+              size={26}
+              color="#FF8C00"
+              style={{ verticalAlign: "bottom", marginRight: "8px" }}
+            />
             Управление заказами
           </Title>
           <Text c="dimmed" mt={5}>
-            Полный список всех клиентских заявок и транзакций
+            Сводка заявок Royal Banners. Отслеживание этапов производства и
+            оплат.
           </Text>
         </div>
 
@@ -306,9 +384,18 @@ export default function Orders() {
 
           <Button
             leftSection={<IconPlus size={16} />}
-            style={{ backgroundColor: "#1B2E3D", color: "white" }}
+            onClick={openCreate}
+            style={{
+              backgroundColor: "#1B2E3D",
+              color: "white",
+              transition: "transform 0.2s",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.transform = "scale(1.02)")
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            Новый заказ (Ручной ввод)
+            Новый заказ
           </Button>
         </Group>
       </Group>
@@ -332,7 +419,7 @@ export default function Orders() {
         <Grid>
           <Grid.Col span={{ base: 12, md: 4 }}>
             <TextInput
-              placeholder="Поиск по клиенту, ID или источнику (калькулятор)..."
+              placeholder="Поиск по клиенту, описанию или ID..."
               leftSection={<IconSearch size={16} />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.currentTarget.value)}
@@ -343,9 +430,10 @@ export default function Orders() {
               leftSection={<IconFilter size={16} />}
               data={[
                 { value: "ALL", label: "Все статусы" },
-                { value: "NEW", label: "Новые (Лиды с сайта)" },
-                { value: "PENDING", label: "В работе (Производство)" },
-                { value: "COMPLETED", label: "Выполненные (Оплачены)" },
+                { value: "NEW", label: "Новые заявки" },
+                { value: "PENDING", label: "Ожидание / Выезд на замер" },
+                { value: "IN_PROGRESS", label: "В работе (Производство)" },
+                { value: "COMPLETED", label: "Выполненные (Сданы)" },
                 { value: "CANCELED", label: "Отмененные" },
               ]}
               value={filterStatus}
@@ -395,9 +483,9 @@ export default function Orders() {
               <Table.Tr>
                 <Table.Th style={{ color: "#1B2E3D" }}>ID / Дата</Table.Th>
                 <Table.Th style={{ color: "#1B2E3D" }}>Клиент</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Детали заказа</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>ТЗ / Описание</Table.Th>
                 <Table.Th style={{ color: "#1B2E3D" }}>Статус</Table.Th>
-                <Table.Th style={{ color: "#1B2E3D" }}>Сумма</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Смета</Table.Th>
                 <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
                   Действия
                 </Table.Th>
@@ -417,15 +505,15 @@ export default function Orders() {
 
                   <Table.Td>
                     <Text fw={500} size="sm" style={{ color: "#1B2E3D" }}>
-                      {order.clientName || "Без имени"}
+                      {order.customerName || order.clientName || "Без имени"}
                     </Text>
                     <Text size="xs" c="dimmed">
-                      {order.clientPhone || "Нет телефона"}
+                      {order.phone || order.clientPhone || "Нет телефона"}
                     </Text>
                   </Table.Td>
 
                   <Table.Td>
-                    <Text size="sm" lineClamp={2} maw={250}>
+                    <Text size="sm" lineClamp={2} maw={280}>
                       {order.description || "Нет описания"}
                     </Text>
                   </Table.Td>
@@ -434,9 +522,9 @@ export default function Orders() {
 
                   <Table.Td>
                     <Text fw={700} size="sm" style={{ color: "#1B2E3D" }}>
-                      {order.price
-                        ? `${order.price.toLocaleString("ru-RU")} ₸`
-                        : "Не указана"}
+                      {order.price || order.totalPrice
+                        ? `${(order.price || order.totalPrice).toLocaleString("ru-RU")} ₸`
+                        : "Смета не готова"}
                     </Text>
                   </Table.Td>
 
@@ -451,7 +539,7 @@ export default function Orders() {
                           <IconEdit size={16} stroke={1.5} />
                         </ActionIcon>
                       </Tooltip>
-                      <Tooltip label="Удалить">
+                      <Tooltip label="Удалить заказ">
                         <ActionIcon
                           variant="light"
                           color="red"
@@ -472,21 +560,120 @@ export default function Orders() {
               Заказы не найдены
             </Text>
             <Text c="dimmed" mt={5}>
-              База данных пуста или сервер не вернул результаты.
+              База данных пуста или нет подходящих результатов по фильтру.
             </Text>
           </Center>
         )}
       </Paper>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО: ФИНАНСЫ И СТАТУС ЗАКАЗА */}
+      {/* МОДАЛЬНОЕ ОКНО 1: ДОБАВЛЕНИЕ НОВОГО ЗАКАЗА */}
       {/* ========================================== */}
       <Modal
-        opened={opened}
-        onClose={close}
+        opened={openedCreate}
+        onClose={closeCreate}
         title={
           <Title order={3} style={{ color: "#1B2E3D" }}>
-            Финансы заказа
+            Новая заявка (Royal Banners)
+          </Title>
+        }
+        size="lg"
+        centered
+        overlayProps={{ backgroundOpacity: 0.55, blur: 3 }}
+      >
+        <form onSubmit={handleCreateOrder}>
+          <Stack gap="md">
+            <Grid>
+              <Grid.Col span={6}>
+                <TextInput
+                  label="Имя клиента / Компания"
+                  placeholder="Иван Иванов"
+                  required
+                  value={newOrder.customerName}
+                  onChange={(e) =>
+                    setNewOrder({
+                      ...newOrder,
+                      customerName: e.currentTarget.value,
+                    })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <TextInput
+                  label="Телефон"
+                  placeholder="+7 (777) 000-00-00"
+                  required
+                  value={newOrder.phone}
+                  onChange={(e) =>
+                    setNewOrder({ ...newOrder, phone: e.currentTarget.value })
+                  }
+                />
+              </Grid.Col>
+            </Grid>
+
+            <Select
+              label="Основной тип работ"
+              data={[
+                { value: "BANNERS", label: "Баннеры" },
+                { value: "LIGHTBOXES", label: "Лайтбоксы" },
+                { value: "SIGNBOARDS", label: "Вывески" },
+                { value: "3D_FIGURES", label: "Объемные фигуры" },
+                { value: "METAL_FRAMES", label: "Металлокаркасы" },
+                { value: "POS_MATERIALS", label: "ПОС материалы" },
+                { value: "DESIGN_PRINT", label: "Дизайн и печать" },
+              ]}
+              value={newOrder.serviceType}
+              onChange={(val) => setNewOrder({ ...newOrder, serviceType: val })}
+            />
+
+            <NumberInput
+              label="Предварительная смета (₸)"
+              description="Если цена пока неизвестна, оставьте 0"
+              min={0}
+              step={5000}
+              value={newOrder.totalPrice}
+              onChange={(val) => setNewOrder({ ...newOrder, totalPrice: val })}
+            />
+
+            <Textarea
+              label="Техническое задание (ТЗ) / Описание"
+              placeholder="Размеры, материалы, особенности монтажа, адрес..."
+              minRows={4}
+              value={newOrder.description}
+              onChange={(e) =>
+                setNewOrder({ ...newOrder, description: e.currentTarget.value })
+              }
+            />
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeCreate}>
+                Отмена
+              </Button>
+              <Button
+                type="submit"
+                loading={isCreating}
+                style={{
+                  backgroundColor: "#FF8C00",
+                  color: "#1B2E3D",
+                  fontWeight: 700,
+                }}
+              >
+                Создать заказ
+              </Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      {/* ========================================== */}
+      {/* МОДАЛЬНОЕ ОКНО 2: ФИНАНСЫ И СТАТУС */}
+      {/* ========================================== */}
+      <Modal
+        opened={openedEdit}
+        onClose={closeEdit}
+        title={
+          <Title order={3} style={{ color: "#1B2E3D" }}>
+            Управление заказом
           </Title>
         }
         size="xl"
@@ -501,16 +688,20 @@ export default function Orders() {
                 <Grid>
                   <Grid.Col span={6}>
                     <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-                      Клиент
+                      Заказчик
                     </Text>
                     <Text fw={600}>
-                      {editingOrder.clientName || "Не указано"}
+                      {editingOrder.customerName ||
+                        editingOrder.clientName ||
+                        "Не указано"}
                     </Text>
-                    <Text size="sm">{editingOrder.clientPhone}</Text>
+                    <Text size="sm">
+                      {editingOrder.phone || editingOrder.clientPhone}
+                    </Text>
                   </Grid.Col>
                   <Grid.Col span={6}>
                     <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-                      Описание от клиента
+                      Описание / ТЗ
                     </Text>
                     <Text size="sm" lineClamp={3}>
                       {editingOrder.description}
@@ -527,12 +718,14 @@ export default function Orders() {
                   <Select
                     label="Статус выполнения"
                     data={[
-                      { value: "NEW", label: "Новый (Не обработан)" },
+                      { value: "NEW", label: "Новая заявка" },
+                      { value: "PENDING", label: "Ожидание / Замер" },
+                      { value: "IN_PROGRESS", label: "В производстве" },
+                      { value: "READY", label: "Готов к монтажу" },
                       {
-                        value: "PENDING",
-                        label: "В работе (Замер / Производство)",
+                        value: "COMPLETED",
+                        label: "Выполнен (Сдан и Оплачен)",
                       },
-                      { value: "COMPLETED", label: "Выполнен (Оплачен)" },
                       { value: "CANCELED", label: "Отменен (Отказ)" },
                     ]}
                     required
@@ -544,7 +737,7 @@ export default function Orders() {
                 <Grid.Col span={6}>
                   <NumberInput
                     label="Итоговая выручка (₸)"
-                    description="Окончательная цена для клиента"
+                    description="Утвержденная смета для клиента"
                     required
                     min={0}
                     step={1000}
@@ -576,10 +769,10 @@ export default function Orders() {
                     <Select
                       label="Категория"
                       data={[
-                        "Материалы",
+                        "Материалы (Акрил, ПВХ, Пленка)",
+                        "Печать (Баннеры, Оракал)",
                         "Монтаж/Подрядчики",
-                        "Доставка/Логистика",
-                        "Зарплата",
+                        "Транспорт/ГСМ",
                         "Прочее",
                       ]}
                       value={expenseCategory}
@@ -590,7 +783,7 @@ export default function Orders() {
                     <NumberInput
                       label="Сумма (₸)"
                       min={0}
-                      step={500}
+                      step={1000}
                       value={expenseAmount}
                       onChange={setExpenseAmount}
                     />
@@ -598,7 +791,7 @@ export default function Orders() {
                   <Grid.Col span={4}>
                     <TextInput
                       label="Комментарий"
-                      placeholder="Например: Покупка акрила"
+                      placeholder="Например: Покупка диодов"
                       value={expenseComment}
                       onChange={(e) => setExpenseComment(e.currentTarget.value)}
                     />
@@ -683,30 +876,15 @@ export default function Orders() {
                       </Text>
                     </div>
                   </Group>
-
-                  <Stack gap={0} align="flex-end">
-                    <Text size="sm" style={{ color: "white" }}>
-                      Выручка: {price.toLocaleString()} ₸
-                    </Text>
-                    <Text size="sm" style={{ color: "#fa5252" }}>
-                      Расходы: -{totalExpenses.toLocaleString()} ₸
-                    </Text>
-                  </Stack>
+                  <Button
+                    type="submit"
+                    loading={isSubmitting}
+                    style={{ backgroundColor: "white", color: "#1B2E3D" }}
+                  >
+                    Сохранить изменения
+                  </Button>
                 </Group>
               </Paper>
-
-              <Group justify="flex-end" mt="md">
-                <Button variant="default" onClick={close}>
-                  Отмена
-                </Button>
-                <Button
-                  type="submit"
-                  loading={isSubmitting}
-                  style={{ backgroundColor: "#1B2E3D" }}
-                >
-                  Сохранить всё
-                </Button>
-              </Group>
             </Stack>
           </form>
         )}

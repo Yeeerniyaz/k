@@ -14,6 +14,7 @@ import {
   Select,
   NumberInput,
   TextInput,
+  Textarea, // 🔥 FIX: Добавили импорт Textarea!
   Badge,
   Center,
   Stack,
@@ -35,9 +36,10 @@ import {
   IconFilter,
   IconArrowsSort,
   IconCalendarEvent,
+  IconBusinessplan,
 } from "@tabler/icons-react";
 
-// 🔥 Senior Update: Импортируем готовые методы из нового axios.js
+// Импортируем готовые методы из нового axios.js
 import {
   fetchExpenses as apiFetchExpenses,
   addExpense as apiAddExpense,
@@ -68,22 +70,22 @@ export default function Finance() {
   const [opened, { open, close }] = useDisclosure(false);
   const [editingId, setEditingId] = useState(null);
 
-  // Поля формы
-  const [category, setCategory] = useState("Аренда помещений");
+  const [category, setCategory] = useState("");
   const [amount, setAmount] = useState(0);
   const [comment, setComment] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Категории общих расходов
+  // Категории, адаптированные под специфику Royal Banners
   const expenseCategories = [
-    "Аренда помещений",
+    "Аренда цеха / офиса",
+    "Зарплата (Оклад / Премии)",
+    "Реклама (Target, 2GIS)",
+    "Закупка общего материала (Склад)",
     "Налоги и сборы",
-    "Зарплата (Оклад)",
-    "Реклама и Маркетинг",
-    "Связь и Интернет",
-    "Хозяйственные нужды",
-    "Транспорт (ГСМ)",
-    "Прочее",
+    "Транспорт и Логистика",
+    "Оборудование и Инструменты",
+    "Прочие корпоративные расходы",
   ];
 
   // ==========================================
@@ -95,10 +97,9 @@ export default function Finance() {
       setError(null);
       // Используем метод из axios.js
       const response = await apiFetchExpenses();
-      setExpenses(response.data.data || response.data || []);
+      setExpenses(response.data?.data || response.data || []);
     } catch (err) {
       console.error("Ошибка загрузки общих расходов:", err);
-      // 🔥 Senior Practice: Никаких фейков в финансах! Если ошибка - ставим пустой массив.
       setExpenses([]);
       setError(
         "Не удалось подключиться к базе данных. Проверьте соединение с сервером.",
@@ -116,69 +117,71 @@ export default function Finance() {
   // БИЗНЕС-ЛОГИКА: ФИЛЬТРАЦИЯ И СОРТИРОВКА
   // ==========================================
   const processedExpenses = [...expenses]
-    .filter((exp) => {
-      // 1. Поиск по тексту (Комментарий)
-      const matchesSearch = (exp.comment || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
+    .filter((item) => {
+      // 1. Поиск по комментарию
+      const searchString = (item.comment || "").toLowerCase();
+      const matchesSearch = searchString.includes(searchTerm.toLowerCase());
 
       // 2. Фильтр по категории
       const matchesCategory =
-        filterCategory === "ALL" ? true : exp.category === filterCategory;
+        filterCategory === "ALL" ? true : item.category === filterCategory;
 
-      // 3. Фильтр по дате (От и До)
-      let matchesDate = true;
-      if (dateFrom && exp.date) {
-        matchesDate = matchesDate && new Date(exp.date) >= new Date(dateFrom);
-      }
-      if (dateTo && exp.date) {
-        const toDateObj = new Date(dateTo);
-        toDateObj.setHours(23, 59, 59, 999); // Конец выбранного дня
-        matchesDate = matchesDate && new Date(exp.date) <= toDateObj;
-      }
+      // 3. Фильтр по дате "От"
+      const matchesDateFrom = dateFrom
+        ? new Date(item.date || item.createdAt) >= new Date(dateFrom)
+        : true;
 
-      return matchesSearch && matchesCategory && matchesDate;
+      // 4. Фильтр по дате "До" (добавляем 1 день, чтобы включить весь день)
+      const matchesDateTo = dateTo
+        ? new Date(item.date || item.createdAt) <=
+          new Date(new Date(dateTo).getTime() + 86400000)
+        : true;
+
+      return (
+        matchesSearch && matchesCategory && matchesDateFrom && matchesDateTo
+      );
     })
     .sort((a, b) => {
-      // 4. Сортировка
+      // 5. Сортировка
       if (sortBy === "DATE_DESC")
-        return new Date(b.date || 0) - new Date(a.date || 0);
+        return (
+          new Date(b.date || b.createdAt || 0) -
+          new Date(a.date || a.createdAt || 0)
+        );
       if (sortBy === "DATE_ASC")
-        return new Date(a.date || 0) - new Date(b.date || 0);
+        return (
+          new Date(a.date || a.createdAt || 0) -
+          new Date(b.date || b.createdAt || 0)
+        );
       if (sortBy === "AMOUNT_DESC") return (b.amount || 0) - (a.amount || 0);
       if (sortBy === "AMOUNT_ASC") return (a.amount || 0) - (b.amount || 0);
       return 0;
     });
 
-  // Расчет итогов для верхних карточек на основе ОТФИЛЬТРОВАННЫХ данных
-  const totalExpensesAmount = processedExpenses.reduce(
-    (sum, item) => sum + item.amount,
+  // Подсчет итоговой суммы отфильтрованных расходов
+  const totalFilteredAmount = processedExpenses.reduce(
+    (sum, item) => sum + (item.amount || 0),
     0,
   );
 
   // ==========================================
-  // БИЗНЕС-ЛОГИКА: ОТКРЫТИЕ МОДАЛКИ
+  // БИЗНЕС-ЛОГИКА: УПРАВЛЕНИЕ ФОРМОЙ
   // ==========================================
-  const handleOpenModal = (item = null) => {
-    if (item) {
-      // Режим редактирования
-      setEditingId(item.id);
-      setCategory(item.category);
-      setAmount(item.amount);
-      setComment(item.comment || "");
+  const handleOpenModal = (expense = null) => {
+    if (expense) {
+      setEditingId(expense.id);
+      setCategory(expense.category);
+      setAmount(expense.amount);
+      setComment(expense.comment || "");
     } else {
-      // Режим создания
       setEditingId(null);
-      setCategory("Аренда помещений");
+      setCategory(expenseCategories[0]);
       setAmount(0);
       setComment("");
     }
     open();
   };
 
-  // ==========================================
-  // БИЗНЕС-ЛОГИКА: СОХРАНЕНИЕ РАСХОДА (REAL DATA)
-  // ==========================================
   const handleSave = async (e) => {
     e.preventDefault();
     if (!category || amount <= 0) {
@@ -197,42 +200,34 @@ export default function Finance() {
       }
 
       close();
-      fetchExpenses(); // Обновляем данные напрямую с сервера
+      fetchExpenses(); // Обновляем данные напрямую с сервера после успеха
     } catch (err) {
       console.error("Ошибка при сохранении расхода:", err);
-      // 🔥 Senior Update: Убрали демо-имитацию. Показываем реальную ошибку.
       alert(err.response?.data?.message || "Ошибка при сохранении транзакции.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // ==========================================
-  // БИЗНЕС-ЛОГИКА: УДАЛЕНИЕ (REAL DATA)
-  // ==========================================
   const handleDelete = async (id) => {
-    if (
-      !window.confirm(
-        "Вы уверены, что хотите удалить эту транзакцию? Это повлияет на общую аналитику.",
-      )
-    )
+    if (!window.confirm("Вы уверены, что хотите удалить эту запись о расходе?"))
       return;
 
     try {
       await apiDeleteExpense(id);
+      // Удаляем из локального состояния только после успешного ответа сервера
       setExpenses((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       console.error("Ошибка при удалении:", err);
-      // 🔥 Senior Update: Убрали демо-имитацию удаления.
       alert(
         err.response?.data?.message ||
-          "Не удалось удалить транзакцию. Убедитесь, что у вас есть права.",
+          "Не удалось удалить расход. Проверьте права доступа.",
       );
     }
   };
 
   // ==========================================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+  // ФУНКЦИИ ФОРМАТИРОВАНИЯ
   // ==========================================
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -254,10 +249,15 @@ export default function Finance() {
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={2} style={{ color: "#1B2E3D" }}>
-            Общие расходы компании
+            <IconBusinessplan
+              size={26}
+              color="#FF8C00"
+              style={{ verticalAlign: "bottom", marginRight: "8px" }}
+            />
+            Финансовый учет
           </Title>
           <Text c="dimmed" mt={5}>
-            Учет операционных затрат (аренда, налоги, маркетинг)
+            Управление корпоративными расходами компании Royal Banners
           </Text>
         </div>
 
@@ -280,9 +280,14 @@ export default function Finance() {
               backgroundColor: "#1B2E3D",
               color: "white",
               fontWeight: 600,
+              transition: "transform 0.2s",
             }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.transform = "scale(1.02)")
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            Зафиксировать расход
+            Добавить расход
           </Button>
         </Group>
       </Group>
@@ -300,90 +305,49 @@ export default function Finance() {
       )}
 
       {/* ========================================== */}
-      {/* МИНИ-ДАШБОРД РАСХОДОВ (ДИНАМИЧЕСКИЙ) */}
+      {/* КАРТОЧКА СТАТИСТИКИ (СУММА ОТФИЛЬТРОВАННОГО) */}
       {/* ========================================== */}
-      <Grid mb="xl">
-        <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
-          <Card
-            withBorder
-            padding="lg"
-            radius="md"
-            shadow="sm"
-            style={{ borderLeft: "4px solid #fa5252" }}
-          >
-            <Group justify="space-between">
-              <Text size="sm" c="dimmed" fw={600} tt="uppercase">
-                Сумма расходов
+      <Card
+        withBorder
+        radius="md"
+        p="lg"
+        mb="xl"
+        shadow="sm"
+        style={{ borderLeft: "4px solid #fa5252" }}
+      >
+        <Group justify="space-between">
+          <Group>
+            <ThemeIcon color="red" variant="light" size={48} radius="md">
+              <IconWallet size={24} />
+            </ThemeIcon>
+            <div>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+                Сумма расходов (По выбранным фильтрам)
               </Text>
-              <ThemeIcon color="red" variant="light" size={38} radius="md">
-                <IconWallet size={20} stroke={1.5} />
-              </ThemeIcon>
-            </Group>
-            <Group align="flex-end" gap="xs" mt={25}>
-              <Text
-                style={{ fontSize: "28px", fontWeight: 700, color: "#fa5252" }}
-              >
-                {totalExpensesAmount.toLocaleString("ru-RU")} ₸
-              </Text>
-            </Group>
-            <Text size="xs" c="dimmed" mt={7}>
-              {filterCategory !== "ALL" || dateFrom || dateTo
-                ? "По выбранным фильтрам"
-                : "За весь период учета"}
-            </Text>
-          </Card>
-        </Grid.Col>
-
-        <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
-          <Card
-            withBorder
-            padding="lg"
-            radius="md"
-            shadow="sm"
-            style={{ borderLeft: "4px solid #1B2E3D" }}
-          >
-            <Group justify="space-between">
-              <Text size="sm" c="dimmed" fw={600} tt="uppercase">
-                Транзакций
-              </Text>
-              <ThemeIcon
-                style={{ backgroundColor: "#1B2E3D" }}
-                variant="filled"
-                size={38}
-                radius="md"
-              >
-                <IconReceipt2 size={20} stroke={1.5} />
-              </ThemeIcon>
-            </Group>
-            <Group align="flex-end" gap="xs" mt={25}>
-              <Text
-                style={{ fontSize: "28px", fontWeight: 700, color: "#1B2E3D" }}
-              >
-                {processedExpenses.length}
-              </Text>
-            </Group>
-            <Text size="xs" c="dimmed" mt={7}>
-              Отображаемых записей
-            </Text>
-          </Card>
-        </Grid.Col>
-      </Grid>
+              <Title order={2} style={{ color: "#1B2E3D" }}>
+                {totalFilteredAmount.toLocaleString("ru-RU")} ₸
+              </Title>
+            </div>
+          </Group>
+          <IconCalendarStats size={40} color="#f1f3f5" />
+        </Group>
+      </Card>
 
       {/* ========================================== */}
       {/* ПАНЕЛЬ ФИЛЬТРОВ И СОРТИРОВКИ */}
       {/* ========================================== */}
       <Paper withBorder p="md" radius="md" mb="xl" bg="white" shadow="sm">
         <Grid align="flex-end">
-          <Grid.Col span={{ base: 12, md: 3 }}>
+          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
             <TextInput
-              label="Поиск по комментариям"
-              placeholder="Введите текст..."
+              label="Поиск"
+              placeholder="Слово в комментарии..."
               leftSection={<IconSearch size={16} />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.currentTarget.value)}
             />
           </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
+          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
             <Select
               label="Категория"
               leftSection={<IconFilter size={16} />}
@@ -399,29 +363,29 @@ export default function Finance() {
             <TextInput
               type="date"
               label="Период с"
+              leftSection={<IconCalendarEvent size={16} />}
               value={dateFrom}
               onChange={(e) => setDateFrom(e.currentTarget.value)}
-              leftSection={<IconCalendarEvent size={16} />}
             />
           </Grid.Col>
           <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
             <TextInput
               type="date"
-              label="Период по"
+              label="По"
+              leftSection={<IconCalendarEvent size={16} />}
               value={dateTo}
               onChange={(e) => setDateTo(e.currentTarget.value)}
-              leftSection={<IconCalendarEvent size={16} />}
             />
           </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 2 }}>
+          <Grid.Col span={{ base: 12, sm: 12, md: 2 }}>
             <Select
               label="Сортировка"
               leftSection={<IconArrowsSort size={16} />}
               data={[
-                { value: "DATE_DESC", label: "Новые (Дата)" },
-                { value: "DATE_ASC", label: "Старые (Дата)" },
-                { value: "AMOUNT_DESC", label: "Дорогие (Сумма)" },
-                { value: "AMOUNT_ASC", label: "Дешевые (Сумма)" },
+                { value: "DATE_DESC", label: "Сначала новые" },
+                { value: "DATE_ASC", label: "Сначала старые" },
+                { value: "AMOUNT_DESC", label: "Сначала крупные" },
+                { value: "AMOUNT_ASC", label: "Сначала мелкие" },
               ]}
               value={sortBy}
               onChange={setSortBy}
@@ -431,11 +395,8 @@ export default function Finance() {
       </Paper>
 
       {/* ========================================== */}
-      {/* ТАБЛИЦА РАСХОДОВ */}
+      {/* ОСНОВНАЯ ТАБЛИЦА РАСХОДОВ */}
       {/* ========================================== */}
-      <Title order={4} mb="md" style={{ color: "#1B2E3D" }}>
-        История транзакций
-      </Title>
       <Paper
         withBorder
         radius="md"
@@ -458,78 +419,73 @@ export default function Finance() {
           >
             <Table.Thead style={{ backgroundColor: "#f8f9fa" }}>
               <Table.Tr>
-                <Table.Th style={{ color: "#1B2E3D" }}>Дата и Время</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Дата</Table.Th>
                 <Table.Th style={{ color: "#1B2E3D" }}>Категория</Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Комментарий</Table.Th>
                 <Table.Th style={{ color: "#1B2E3D" }}>
-                  Комментарий / Детали
+                  Связь с заказом
                 </Table.Th>
-                <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
-                  Сумма
-                </Table.Th>
+                <Table.Th style={{ color: "#1B2E3D" }}>Сумма</Table.Th>
                 <Table.Th style={{ color: "#1B2E3D", textAlign: "right" }}>
                   Действия
                 </Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {processedExpenses.map((item) => (
-                <Table.Tr key={item.id}>
-                  {/* Дата */}
+              {processedExpenses.map((expense) => (
+                <Table.Tr key={expense.id}>
                   <Table.Td>
-                    <Group gap="xs">
-                      <IconCalendarStats size={16} color="gray" />
-                      <Text size="sm" fw={500} style={{ color: "#1B2E3D" }}>
-                        {formatDate(item.date)}
-                      </Text>
-                    </Group>
+                    <Text size="sm" c="dimmed" fw={500}>
+                      {formatDate(expense.date || expense.createdAt)}
+                    </Text>
                   </Table.Td>
 
-                  {/* Категория */}
                   <Table.Td>
-                    <Badge
-                      color="gray"
-                      variant="light"
-                      style={{ color: "#1B2E3D" }}
-                    >
-                      {item.category}
+                    <Badge color="blue" variant="light" size="md">
+                      {expense.category}
                     </Badge>
                   </Table.Td>
 
-                  {/* Комментарий */}
                   <Table.Td>
                     <Text size="sm" lineClamp={2} maw={300}>
-                      {item.comment || (
-                        <Text fs="italic" c="dimmed">
-                          Нет комментария
-                        </Text>
-                      )}
+                      {expense.comment || "Без комментария"}
                     </Text>
                   </Table.Td>
 
-                  {/* Сумма */}
-                  <Table.Td style={{ textAlign: "right" }}>
+                  <Table.Td>
+                    {expense.orderId ? (
+                      <Badge color="orange" variant="dot">
+                        ID: {expense.orderId.slice(0, 8)}
+                      </Badge>
+                    ) : (
+                      <Text size="xs" c="dimmed">
+                        Общий расход
+                      </Text>
+                    )}
+                  </Table.Td>
+
+                  <Table.Td>
                     <Text fw={700} color="red">
-                      -{item.amount.toLocaleString("ru-RU")} ₸
+                      -{expense.amount.toLocaleString("ru-RU")} ₸
                     </Text>
                   </Table.Td>
 
-                  {/* Действия */}
                   <Table.Td style={{ textAlign: "right" }}>
                     <Group gap="xs" justify="flex-end">
                       <Tooltip label="Редактировать">
                         <ActionIcon
                           variant="light"
                           color="blue"
-                          onClick={() => handleOpenModal(item)}
+                          onClick={() => handleOpenModal(expense)}
                         >
                           <IconEdit size={16} stroke={1.5} />
                         </ActionIcon>
                       </Tooltip>
-                      <Tooltip label="Удалить транзакцию">
+                      <Tooltip label="Удалить">
                         <ActionIcon
                           variant="light"
                           color="red"
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => handleDelete(expense.id)}
                         >
                           <IconTrash size={16} stroke={1.5} />
                         </ActionIcon>
@@ -542,40 +498,26 @@ export default function Finance() {
           </Table>
         ) : (
           <Center style={{ padding: "60px 20px", flexDirection: "column" }}>
-            <IconReceipt2 size={48} color="#e0e0e0" stroke={1.5} />
+            <IconReceipt2 size={60} color="#dee2e6" stroke={1.5} />
             <Text size="lg" fw={500} mt="md" style={{ color: "#1B2E3D" }}>
-              Транзакции не найдены
+              Записей не найдено
             </Text>
             <Text c="dimmed" mt={5}>
-              База данных пуста или фильтры не дали результатов.
+              По заданным фильтрам расходов нет, или база еще пуста.
             </Text>
-            <Button
-              mt="md"
-              variant="default"
-              onClick={() => {
-                setSearchTerm("");
-                setFilterCategory("ALL");
-                setDateFrom("");
-                setDateTo("");
-              }}
-            >
-              Сбросить фильтры
-            </Button>
           </Center>
         )}
       </Paper>
 
       {/* ========================================== */}
-      {/* МОДАЛЬНОЕ ОКНО: ДОБАВИТЬ / РЕДАКТИРОВАТЬ */}
+      {/* МОДАЛЬНОЕ ОКНО СОЗДАНИЯ / РЕДАКТИРОВАНИЯ */}
       {/* ========================================== */}
       <Modal
         opened={opened}
         onClose={close}
         title={
           <Title order={3} style={{ color: "#1B2E3D" }}>
-            {editingId
-              ? "Редактировать транзакцию"
-              : "Новый операционный расход"}
+            {editingId ? "Редактировать расход" : "Новый расход"}
           </Title>
         }
         size="md"
@@ -586,7 +528,7 @@ export default function Finance() {
           <Stack gap="md">
             <Select
               label="Категория расхода"
-              placeholder="Выберите из списка"
+              placeholder="Выберите категорию"
               data={expenseCategories}
               required
               value={category}
@@ -596,34 +538,38 @@ export default function Finance() {
 
             <NumberInput
               label="Сумма (₸)"
-              placeholder="Сколько потрачено"
+              placeholder="Например: 50000"
               required
               min={0}
               step={1000}
               value={amount}
               onChange={setAmount}
               styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
-              leftSection={
-                <Text fw={700} c="dimmed" ml="xs">
-                  ₸
-                </Text>
-              }
             />
 
-            <TextInput
-              label="Детали / Комментарий"
-              placeholder="Например: Аренда за март 2026"
+            <Textarea
+              label="Комментарий"
+              placeholder="Например: Оплата аренды за Май"
+              minRows={3}
               value={comment}
               onChange={(e) => setComment(e.currentTarget.value)}
               styles={{ label: { color: "#1B2E3D", fontWeight: 600 } }}
             />
 
-            <Group justify="flex-end" mt="xl">
+            <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={close}>
                 Отмена
               </Button>
-              <Button type="submit" loading={isSubmitting} color="red">
-                {editingId ? "Сохранить изменения" : "Списать средства"}
+              <Button
+                type="submit"
+                loading={isSubmitting}
+                style={{
+                  backgroundColor: "#FF8C00",
+                  color: "#1B2E3D",
+                  fontWeight: 700,
+                }}
+              >
+                {editingId ? "Сохранить изменения" : "Добавить расход"}
               </Button>
             </Group>
           </Stack>

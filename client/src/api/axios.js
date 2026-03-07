@@ -85,9 +85,8 @@ export const deletePrice = (id) => API.delete(`/prices/${id}`);
 
 // --- PORTFOLIO (Наши работы) ---
 export const fetchPortfolio = () => API.get('/portfolio');
-export const addPortfolio = (formData) => API.post('/portfolio', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-});
+// Нағыз Senior варианты: Axios бәрін өзі реттейді
+export const addPortfolio = (formData) => API.post('/portfolio', formData);
 export const updatePortfolioItem = (id, data) => API.put(`/portfolio/${id}`, data);
 export const deletePortfolioItem = (id) => API.delete(`/portfolio/${id}`);
 
