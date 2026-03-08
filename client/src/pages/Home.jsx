@@ -155,7 +155,6 @@ export default function Home() {
       } catch (error) {
         console.error("Ошибка загрузки данных витрины:", error);
         setIsDbConnected(false);
-        // 🔥 Senior Practice: Никаких фейковых данных для калькулятора на витрине!
         setPriceList([]);
         setCalcConfigs([]);
         setActiveConfigId("");
@@ -466,7 +465,7 @@ export default function Home() {
               >
                 <ActionIcon
                   component="a"
-                  href="https://wa.me/77770000000"
+                  href="https://wa.me/77089321854"
                   target="_blank"
                   variant="transparent"
                   color="gray"
@@ -483,30 +482,13 @@ export default function Home() {
               >
                 <ActionIcon
                   component="a"
-                  href="https://instagram.com/royalbanners"
+                  href="https://instagram.com/royal.banners.almaty"
                   target="_blank"
                   variant="transparent"
                   color="gray"
                   size="lg"
                 >
                   <IconBrandInstagram size={24} stroke={1.5} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip
-                label="Наш TikTok"
-                withArrow
-                position="bottom"
-                color="dark"
-              >
-                <ActionIcon
-                  component="a"
-                  href="https://tiktok.com/@royalbanners"
-                  target="_blank"
-                  variant="transparent"
-                  color="gray"
-                  size="lg"
-                >
-                  <IconBrandTiktok size={24} stroke={1.5} />
                 </ActionIcon>
               </Tooltip>
             </Group>
@@ -740,13 +722,15 @@ export default function Home() {
                             }))}
                             styles={{
                               input: {
-                                backgroundColor: "white",
-                                color: "#1B2E3D",
+                                backgroundColor: "rgba(255,255,255,0.1)",
+                                color: "white",
+                                border: "1px solid rgba(255,255,255,0.2)",
                               },
+                              dropdown: { backgroundColor: "white" },
                             }}
                           />
 
-                          {activeConfig && availablePrices.length > 0 && (
+                          {availablePrices.length > 0 && (
                             <Select
                               label={
                                 <Text style={{ color: "white" }}>
@@ -757,127 +741,109 @@ export default function Home() {
                               onChange={setSelectedPriceId}
                               data={availablePrices.map((p) => ({
                                 value: p.id || p.service,
-                                label: p.service,
+                                label: `${p.service} (${p.price} ₸/${p.unit})`,
                               }))}
                               styles={{
                                 input: {
-                                  backgroundColor: "white",
-                                  color: "#1B2E3D",
+                                  backgroundColor: "rgba(255,255,255,0.1)",
+                                  color: "white",
+                                  border: "1px solid rgba(255,255,255,0.2)",
                                 },
+                                dropdown: { backgroundColor: "white" },
                               }}
                             />
                           )}
 
-                          {activeConfig && (
-                            <Grid>
-                              {activeConfig.fields.map((field) => (
-                                <Grid.Col
-                                  span={activeConfig.fields.length > 1 ? 6 : 12}
-                                  key={field.name}
-                                >
-                                  <NumberInput
-                                    label={
-                                      <Text style={{ color: "white" }}>
-                                        {field.label}
-                                      </Text>
-                                    }
-                                    value={fieldValues[field.name]}
-                                    onChange={(val) =>
-                                      handleFieldChange(field.name, val)
-                                    }
-                                    min={0}
-                                    step={0.5}
-                                    styles={{
-                                      input: { backgroundColor: "white" },
-                                    }}
-                                  />
-                                </Grid.Col>
+                          {activeConfig?.fields.length > 0 && (
+                            <Group grow>
+                              {activeConfig.fields.map((f, idx) => (
+                                <NumberInput
+                                  key={idx}
+                                  label={
+                                    <Text style={{ color: "white" }}>
+                                      {f.label}
+                                    </Text>
+                                  }
+                                  min={0}
+                                  value={fieldValues[f.name] || 0}
+                                  onChange={(val) =>
+                                    handleFieldChange(f.name, val)
+                                  }
+                                  styles={{
+                                    input: {
+                                      backgroundColor: "rgba(255,255,255,0.1)",
+                                      color: "white",
+                                      border: "1px solid rgba(255,255,255,0.2)",
+                                    },
+                                  }}
+                                />
                               ))}
-                            </Grid>
+                            </Group>
                           )}
 
-                          {activeConfig &&
-                            activeConfig.addons &&
-                            activeConfig.addons.length > 0 && (
-                              <Box
-                                mt="xs"
-                                p="sm"
-                                style={{
-                                  backgroundColor: "rgba(255,255,255,0.05)",
-                                  borderRadius: "8px",
-                                }}
+                          {activeConfig?.addons?.length > 0 && (
+                            <Box mt="xs">
+                              <Text
+                                size="sm"
+                                mb="xs"
+                                style={{ color: "white" }}
                               >
-                                <Text
-                                  size="sm"
-                                  mb="xs"
-                                  style={{ color: "white", fontWeight: 600 }}
-                                >
-                                  Дополнительные опции:
-                                </Text>
-                                <Stack gap="xs">
-                                  {activeConfig.addons.map((addon) => (
-                                    <Checkbox
-                                      key={addon.id}
-                                      label={addon.name}
-                                      color="dark"
-                                      styles={{ label: { color: "white" } }}
-                                      checked={selectedAddons.includes(
+                                Дополнительно:
+                              </Text>
+                              <Stack gap="xs">
+                                {activeConfig.addons.map((addon) => (
+                                  <Checkbox
+                                    key={addon.id}
+                                    label={
+                                      <Text style={{ color: "white" }}>
+                                        {addon.name}
+                                      </Text>
+                                    }
+                                    color="orange"
+                                    checked={selectedAddons.includes(addon.id)}
+                                    onChange={(event) =>
+                                      handleAddonChange(
                                         addon.id,
-                                      )}
-                                      onChange={(event) =>
-                                        handleAddonChange(
-                                          addon.id,
-                                          event.currentTarget.checked,
-                                        )
-                                      }
-                                    />
-                                  ))}
-                                </Stack>
-                              </Box>
-                            )}
+                                        event.currentTarget.checked,
+                                      )
+                                    }
+                                  />
+                                ))}
+                              </Stack>
+                            </Box>
+                          )}
 
-                          <Divider my="sm" color="rgba(255,255,255,0.2)" />
+                          <Divider color="rgba(255,255,255,0.1)" my="sm" />
 
-                          <div>
-                            <Text
-                              size="sm"
-                              style={{ color: "rgba(255,255,255,0.7)" }}
-                            >
-                              Примерный бюджет (ОТ):
-                            </Text>
-                            <Title order={1} style={{ color: "white" }}>
-                              ~ {calculateEstimate().toLocaleString("ru-RU")} ₸
-                            </Title>
-                            <Text
-                              size="xs"
-                              mt={5}
-                              style={{ color: "rgba(255,255,255,0.5)" }}
-                            >
-                              *Не является публичной офертой. Без учета
-                              сложности монтажа.
-                            </Text>
-                          </div>
+                          <Group justify="space-between" align="flex-end">
+                            <Box>
+                              <Text
+                                size="xs"
+                                tt="uppercase"
+                                style={{ color: "rgba(255,255,255,0.6)" }}
+                              >
+                                Примерная цена
+                              </Text>
+                              <Text
+                                size="xl"
+                                fw={800}
+                                style={{ color: "white" }}
+                              >
+                                ~{calculateEstimate().toLocaleString("ru-RU")} ₸
+                              </Text>
+                            </Box>
+                          </Group>
 
-                          <Box
-                            mt="xs"
+                          <Paper
                             p="md"
-                            style={{
-                              backgroundColor: "rgba(255,255,255,0.05)",
-                              borderRadius: "8px",
-                              border: "1px dashed rgba(255,255,255,0.3)",
-                            }}
+                            radius="md"
+                            bg="rgba(255,255,255,0.05)"
+                            mt="sm"
                           >
-                            <Text
-                              size="sm"
-                              fw={600}
-                              style={{ color: "white" }}
-                              mb="xs"
-                            >
-                              Получить точную смету от инженера
+                            <Text size="sm" style={{ color: "white" }} mb="xs">
+                              Оставьте номер для точного расчета:
                             </Text>
                             <TextInput
-                              type="tel"
-                              maxLength={20}
                               placeholder="+7 (___) ___-__-__"
                               value={leadPhone}
                               onChange={(e) =>
@@ -907,11 +873,11 @@ export default function Home() {
                                 fontWeight: 700,
                               }}
                             >
-                              Отправить запрос
+                              Отправить смету менеджеру
                             </Button>
-                          </Box>
+                          </Paper>
                         </>
-                      ) : (
+                      ) : !isDbConnected ? (
                         <Center
                           p="xl"
                           style={{
@@ -923,43 +889,48 @@ export default function Home() {
                             size={40}
                             color="rgba(255,255,255,0.5)"
                           />
-                          <Text color="white" mt="md">
+                          <Text style={{ color: "white" }} mt="md">
+                            Нет связи с сервером.
+                          </Text>
+                          <Text size="sm" c="dimmed">
                             Калькулятор временно недоступен.
                           </Text>
                         </Center>
+                      ) : (
+                        <Text style={{ color: "white" }} ta="center">
+                          Калькулятор настраивается...
+                        </Text>
                       )}
                     </Stack>
                   ) : (
                     <Center
-                      style={{
-                        flexDirection: "column",
-                        height: "100%",
-                        minHeight: "400px",
-                        textAlign: "center",
-                      }}
+                      p="xl"
+                      style={{ flexDirection: "column", textAlign: "center" }}
                     >
                       <ThemeIcon
-                        size={80}
+                        size={60}
                         radius="100px"
-                        color="teal"
+                        color="green"
                         variant="light"
                         mb="md"
                       >
-                        <IconCheck size={40} />
+                        <IconCheck size={30} />
                       </ThemeIcon>
                       <Title order={3} style={{ color: "white" }}>
-                        Запрос принят!
+                        Заявка принята!
                       </Title>
-                      <Text
-                        size="sm"
-                        mt="sm"
-                        style={{ color: "rgba(255,255,255,0.8)" }}
-                      >
-                        Ваши данные и предварительный расчет переданы инженеру.
-                        <br />
-                        Мы перезвоним на номер {leadPhone} для уточнения
-                        деталей.
+                      <Text style={{ color: "rgba(255,255,255,0.7)" }} mt="sm">
+                        Мы получили ваш запрос. Менеджер свяжется с вами в
+                        течение 15 минут для уточнения деталей.
                       </Text>
+                      <Button
+                        mt="xl"
+                        variant="subtle"
+                        color="gray"
+                        onClick={() => setLeadSuccess(false)}
+                      >
+                        Рассчитать еще
+                      </Button>
                     </Center>
                   )}
                 </Paper>
@@ -967,192 +938,244 @@ export default function Home() {
 
               {/* ПРАЙС-ЛИСТ */}
               <Grid.Col span={{ base: 12, md: 7 }}>
-                <Group
-                  justify="space-between"
-                  align="flex-end"
-                  mb="xs"
-                  mt={{ base: 40, md: 32 }}
-                >
-                  <Title order={2} style={{ color: "#1B2E3D" }}>
-                    Базовый прайс-лист
-                  </Title>
-                  {!loadingData && (
-                    <Badge
-                      variant="light"
-                      color={isDbConnected ? "green" : "red"}
-                      leftSection={
-                        isDbConnected ? (
-                          <IconDatabase size={12} />
-                        ) : (
-                          <IconServerOff size={12} />
-                        )
-                      }
-                    >
-                      {isDbConnected ? "Актуально" : "Нет связи"}
-                    </Badge>
-                  )}
-                </Group>
-                <Text c="dimmed" mb="xl">
-                  Ознакомьтесь с ценами на основные позиции.
-                </Text>
-
+                <Title order={3} mb="lg" style={{ color: "#1B2E3D" }}>
+                  Открытый прайс-лист
+                </Title>
                 <Paper
                   withBorder
                   radius="md"
-                  bg="white"
+                  p={0}
                   style={{ overflow: "hidden" }}
                 >
-                  <Table
-                    striped
-                    highlightOnHover
-                    verticalSpacing="md"
-                    horizontalSpacing="md"
-                  >
-                    <Table.Thead style={{ backgroundColor: "#1B2E3D" }}>
-                      <Table.Tr>
-                        <Table.Th style={{ color: "white" }}>
-                          Наименование
-                        </Table.Th>
-                        <Table.Th style={{ color: "white" }}>Ед. изм.</Table.Th>
-                        <Table.Th
-                          style={{ color: "white", textAlign: "right" }}
-                        >
-                          Цена от
-                        </Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {loadingData ? (
+                  <div style={{ maxHeight: "500px", overflowY: "auto" }}>
+                    <Table striped highlightOnHover verticalSpacing="sm">
+                      <Table.Thead
+                        style={{
+                          position: "sticky",
+                          top: 0,
+                          backgroundColor: "#f8f9fa",
+                          zIndex: 1,
+                        }}
+                      >
                         <Table.Tr>
-                          <Table.Td colSpan={3} ta="center" py="xl">
-                            <Loader color="#1B2E3D" />
-                          </Table.Td>
+                          <Table.Th style={{ color: "#1B2E3D" }}>
+                            Наименование
+                          </Table.Th>
+                          <Table.Th style={{ color: "#1B2E3D" }}>Ед.</Table.Th>
+                          <Table.Th
+                            style={{ color: "#1B2E3D", textAlign: "right" }}
+                          >
+                            Цена (от)
+                          </Table.Th>
                         </Table.Tr>
-                      ) : priceList.length > 0 ? (
-                        priceList.map((item, index) => (
-                          <Table.Tr key={index}>
-                            <Table.Td fw={500} style={{ color: "#1B2E3D" }}>
-                              {item.service}
-                            </Table.Td>
-                            <Table.Td c="dimmed">{item.unit}</Table.Td>
-                            <Table.Td
-                              ta="right"
-                              fw={700}
-                              style={{ color: "#1B2E3D" }}
-                            >
-                              {item.price.toLocaleString("ru-RU")} ₸
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {loadingData ? (
+                          <Table.Tr>
+                            <Table.Td colSpan={3}>
+                              <Center p="xl">
+                                <Loader size="sm" color="gray" />
+                              </Center>
                             </Table.Td>
                           </Table.Tr>
-                        ))
-                      ) : (
-                        <Table.Tr>
-                          <Table.Td colSpan={3} ta="center" py="xl" c="dimmed">
-                            Прайс-лист временно пуст
-                          </Table.Td>
-                        </Table.Tr>
-                      )}
-                    </Table.Tbody>
-                  </Table>
+                        ) : !isDbConnected ? (
+                          <Table.Tr>
+                            <Table.Td colSpan={3} align="center">
+                              <Text c="dimmed" size="sm" py="md">
+                                Прайс-лист загружается или временно недоступен
+                              </Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ) : priceList.length > 0 ? (
+                          priceList.map((item, idx) => (
+                            <Table.Tr key={idx}>
+                              <Table.Td>
+                                <Text fw={500} size="sm">
+                                  {item.service}
+                                </Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Badge color="gray" variant="light">
+                                  {item.unit}
+                                </Badge>
+                              </Table.Td>
+                              <Table.Td style={{ textAlign: "right" }}>
+                                <Text fw={700} style={{ color: "#1B2E3D" }}>
+                                  {item.price.toLocaleString("ru-RU")} ₸
+                                </Text>
+                              </Table.Td>
+                            </Table.Tr>
+                          ))
+                        ) : (
+                          <Table.Tr>
+                            <Table.Td colSpan={3} align="center">
+                              <Text c="dimmed" size="sm" py="md">
+                                Прайс-лист пуст
+                              </Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        )}
+                      </Table.Tbody>
+                    </Table>
+                  </div>
                 </Paper>
               </Grid.Col>
             </Grid>
           </Container>
         </Box>
 
-        {/* 5. ЭТАПЫ РАБОТЫ И FAQ */}
-        <Center mb={40}>
-          <Title order={2} style={{ color: "#1B2E3D" }}>
-            Ответы на частые вопросы
-          </Title>
-        </Center>
-        <Accordion
-          variant="separated"
-          radius="md"
-          style={{ maxWidth: "800px", margin: "0 auto" }}
-        >
-          <Accordion.Item value="q1">
-            <Accordion.Control style={{ fontWeight: 600, color: "#1B2E3D" }}>
-              Сколько времени занимает изготовление вывески?
-            </Accordion.Control>
-            <Accordion.Panel>
-              В среднем от 3 до 7 рабочих дней в зависимости от сложности
-              конструкции и наличия нестандартных материалов.
-            </Accordion.Panel>
-          </Accordion.Item>
-          <Accordion.Item value="q2">
-            <Accordion.Control style={{ fontWeight: 600, color: "#1B2E3D" }}>
-              Вы делаете согласование вывески с акиматом?
-            </Accordion.Control>
-            <Accordion.Panel>
-              Да, мы можем подготовить эскизный проект и помочь с процедурой
-              законного согласования наружной рекламы.
-            </Accordion.Panel>
-          </Accordion.Item>
-          <Accordion.Item value="q3">
-            <Accordion.Control style={{ fontWeight: 600, color: "#1B2E3D" }}>
-              Есть ли гарантия на диоды и блоки питания?
-            </Accordion.Control>
-            <Accordion.Panel>
-              Абсолютно. Мы даем официальную гарантию от 1 года на всю электрику
-              и светотехнику, используемую в лайтбоксах и буквах.
-            </Accordion.Panel>
-          </Accordion.Item>
-        </Accordion>
+        {/* 5. ЧАСТЫЕ ВОПРОСЫ */}
+        <Container size="md" py={80}>
+          <Center mb={50}>
+            <Title order={2} style={{ color: "#1B2E3D" }}>
+              Частые вопросы
+            </Title>
+          </Center>
+          <Accordion
+            variant="separated"
+            radius="md"
+            styles={{
+              item: { border: "1px solid #eaeaea" },
+              control: { fontWeight: 600, color: "#1B2E3D" },
+            }}
+          >
+            {[
+              {
+                q: "Сколько времени занимает изготовление вывески?",
+                a: "Сроки зависят от сложности проекта. Стандартные лайтбоксы и баннеры мы изготавливаем от 1 до 3 рабочих дней. Сложные объемные буквы и крышные установки — от 5 до 10 дней.",
+              },
+              {
+                q: "Даете ли вы гарантию на работу?",
+                a: "Да, мы предоставляем официальную гарантию от 1 года на все световые элементы (диоды, блоки питания) и несущие металлоконструкции.",
+              },
+              {
+                q: "Выезжаете ли вы на замер бесплатно?",
+                a: "Да, выезд инженера-замерщика по городу Алматы осуществляется абсолютно бесплатно. Специалист оценит фасад, сделает точные замеры и проконсультирует по материалам.",
+              },
+              {
+                q: "Делаете ли вы согласование вывесок с акиматом?",
+                a: "Да, наша компания может взять на себя все бюрократические вопросы по получению разрешительных документов на размещение наружной рекламы в архитектуре города.",
+              },
+            ].map((faq, idx) => (
+              <Accordion.Item value={`faq-${idx}`} key={idx}>
+                <Accordion.Control>{faq.q}</Accordion.Control>
+                <Accordion.Panel>
+                  <Text size="sm" c="dimmed" lh={1.6}>
+                    {faq.a}
+                  </Text>
+                </Accordion.Panel>
+              </Accordion.Item>
+            ))}
+          </Accordion>
+        </Container>
       </Container>
 
       {/* 6. КОНТАКТЫ И ФОРМА */}
       <Box bg="#1B2E3D" py={80} id="contacts">
         <Container size="lg">
           <Grid gutter={60}>
+            {/* ЛЕВАЯ ЧАСТЬ - КОНТАКТЫ (ИСКЛЮЧИТЕЛЬНО ДИЗАЙН БЕЗ ИЗМЕНЕНИЯ ЛОГИКИ) */}
             <Grid.Col span={{ base: 12, md: 5 }}>
               <Title order={2} style={{ color: "white" }} mb="xl">
                 Свяжитесь с нами
               </Title>
               <Text style={{ color: "rgba(255,255,255,0.7)" }} mb="xl" lh={1.6}>
-                Оставьте заявку, и наш инженер свяжется с вами для подробной
-                консультации и организации выезда на замер.
+                Готовы обсудить ваш проект? Оставьте заявку, и мы перезвоним вам
+                в ближайшее время для бесплатной консультации.
               </Text>
 
-              <Stack gap="lg" mt={40}>
-                <Group>
+              <Stack gap="xl" mt={40}>
+                <Group wrap="nowrap">
                   <ThemeIcon
-                    size={40}
+                    size={54}
                     radius="xl"
                     color="rgba(255,255,255,0.1)"
                     variant="filled"
                   >
-                    <IconPhone size={20} color="white" />
+                    <IconPhone size={26} color="white" />
                   </ThemeIcon>
                   <div>
-                    <Text size="xs" style={{ color: "rgba(255,255,255,0.5)" }}>
-                      Телефон
+                    <Text
+                      size="xs"
+                      tt="uppercase"
+                      fw={700}
+                      style={{
+                        color: "rgba(255,255,255,0.5)",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      Телефон / WhatsApp
                     </Text>
-                    <Text size="lg" fw={600} style={{ color: "white" }}>
-                      +7 (777) 000-00-00
+                    <Text size="xl" fw={700} style={{ color: "white" }}>
+                      +7 708 932 1854
                     </Text>
                   </div>
                 </Group>
-                <Group>
+
+                <Group wrap="nowrap">
                   <ThemeIcon
-                    size={40}
+                    size={54}
                     radius="xl"
                     color="rgba(255,255,255,0.1)"
                     variant="filled"
                   >
-                    <IconMapPin size={20} color="white" />
+                    <IconBrandInstagram size={26} color="white" />
                   </ThemeIcon>
                   <div>
-                    <Text size="xs" style={{ color: "rgba(255,255,255,0.5)" }}>
-                      Адрес
+                    <Text
+                      size="xs"
+                      tt="uppercase"
+                      fw={700}
+                      style={{
+                        color: "rgba(255,255,255,0.5)",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      Наш Instagram
                     </Text>
-                    <Text size="lg" fw={600} style={{ color: "white" }}>
-                      г. Алматы
+                    <Text
+                      size="xl"
+                      fw={700}
+                      style={{ color: "white", textDecoration: "none" }}
+                      component="a"
+                      href="https://instagram.com/royal.banners.almaty"
+                      target="_blank"
+                    >
+                      @royal.banners.almaty
+                    </Text>
+                  </div>
+                </Group>
+
+                <Group wrap="nowrap">
+                  <ThemeIcon
+                    size={54}
+                    radius="xl"
+                    color="rgba(255,255,255,0.1)"
+                    variant="filled"
+                  >
+                    <IconClock size={26} color="white" />
+                  </ThemeIcon>
+                  <div>
+                    <Text
+                      size="xs"
+                      tt="uppercase"
+                      fw={700}
+                      style={{
+                        color: "rgba(255,255,255,0.5)",
+                        letterSpacing: "1px",
+                      }}
+                    >
+                      Режим работы
+                    </Text>
+                    <Text size="xl" fw={700} style={{ color: "white" }}>
+                      Пн-Пт: 09:00 - 18:00
                     </Text>
                   </div>
                 </Group>
               </Stack>
             </Grid.Col>
 
+            {/* ПРАВАЯ ЧАСТЬ - ФОРМА (БЕЗ ИЗМЕНЕНИЙ) */}
             <Grid.Col span={{ base: 12, md: 7 }}>
               <Paper
                 p="xl"
@@ -1272,7 +1295,7 @@ export default function Home() {
               ROYAL BANNERS
             </Title>
             <Text size="sm" style={{ color: "rgba(255,255,255,0.5)" }}>
-              © 2026 Все права защищены.
+              © 2026 Все права защищены. ERP-система внедрена.
             </Text>
 
             <Group gap="sm">
@@ -1282,7 +1305,7 @@ export default function Home() {
                 size="lg"
                 radius="xl"
                 component="a"
-                href="https://wa.me/77770000000"
+                href="https://wa.me/77089321854"
                 target="_blank"
                 aria-label="Написать в WhatsApp"
               >
@@ -1294,23 +1317,11 @@ export default function Home() {
                 size="lg"
                 radius="xl"
                 component="a"
-                href="https://instagram.com/royalbanners"
+                href="https://instagram.com/royal.banners.almaty"
                 target="_blank"
                 aria-label="Перейти в Instagram"
               >
                 <IconBrandInstagram size={22} />
-              </ActionIcon>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="lg"
-                radius="xl"
-                component="a"
-                href="https://tiktok.com/@royalbanners"
-                target="_blank"
-                aria-label="Перейти в TikTok"
-              >
-                <IconBrandTiktok size={22} />
               </ActionIcon>
             </Group>
           </Group>
