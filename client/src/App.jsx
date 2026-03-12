@@ -42,6 +42,9 @@ import Prices from "./pages/Prices.jsx";
 import Finance from "./pages/Finance.jsx";
 import CalculatorSettings from "./pages/CalculatorSettings.jsx";
 import PublicPortfolio from "./pages/PublicPortfolio.jsx";
+import PageBuilder from "./pages/PageBuilder";
+
+// Внутри твоих роутов
 
 // ==========================================
 // СЕНЬОРСКАЯ АРХИТЕКТУРА: ИЗОЛИРОВАННАЯ АДМИНКА
@@ -208,6 +211,17 @@ const AdminLayout = () => {
           variant="light"
           active={location.pathname === "/admin/users"}
         />
+        <NavLink
+          label="Страница"
+          leftSection={<IconUsers size="1.1rem" stroke={1.5} />}
+          onClick={() => {
+            navigate("/admin/cms");
+            toggle();
+          }}
+          color="royalBlue"
+          variant="light"
+          active={location.pathname === "/admin/cms"}
+        />
       </AppShell.Navbar>
 
       {/* ========================================== */}
@@ -222,6 +236,7 @@ const AdminLayout = () => {
           <Route path="/calculator-settings" element={<CalculatorSettings />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/users" element={<Users />} />
+          <Route path="/cms" element={<PageBuilder />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </AppShell.Main>

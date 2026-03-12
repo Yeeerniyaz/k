@@ -1,9 +1,10 @@
 // ==========================================
-// ЯДРО БАЗЫ ДАННЫХ ROYAL BANNERS (ERP & CRM)
+// ЯДРО БАЗЫ ДАННЫХ ROYAL BANNERS (ERP & CRM & HEADLESS CMS)
 // ==========================================
 
 datasource db {
-  provider = "postgresql" // Оставляем твой PostgreSQL
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -14,62 +15,79 @@ generator client {
 // 1. ПОЛЬЗОВАТЕЛИ (Админ, Менеджеры, постоянные B2B клиенты)
 // ==========================================
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // Хэш пароля
-  role      Role     @default(CLIENT)
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String     // Хэш пароля
+  role      Role       @default(CLIENT)
   name      String?
   phone     String?
-  orders    Order[]  // Связь: один клиент может иметь много заказов
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  avatarUrl String?    // Аватарка пользователя
+  
+  orders    Order[]    // Связь: один клиент может иметь много заказов
+  auditLogs AuditLog[] // Связь: действия, совершенные этим пользователем
+  media     MediaLibrary[] // Загруженные пользователем файлы
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([email])
+  @@index([role])
 }
 
 // ==========================================
 // 2. ПОРТФОЛИО (Кейсы из Instagram, витрина)
 // ==========================================
 model Portfolio {
-  id          String   @id @default(uuid())
-  title       String   // "Вывеска для GLOBAL DENT"
+  id          String          @id @default(uuid())
+  title       String          // "Вывеска для GLOBAL DENT"
   category    ServiceCategory // "BANNERS", "METAL_FRAMES" и т.д.
+  
   // 🔥 SENIOR UPDATE: Теперь это МАССИВЫ строк, чтобы хранить несколько фото!
   imageUrls   String[] 
   publicIds   String[] 
   
   description String?
-  isVisible   Boolean  @default(true) // Можно временно скрыть
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isVisible   Boolean         @default(true) // Можно временно скрыть
+  
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([category])
+  @@index([isVisible])
 }
 
 // ==========================================
 // 3. ЗАКАЗЫ (Падают с калькулятора в CRM)
 // ==========================================
 model Order {
-  id          String      @id @default(uuid())
+  id           String      @id @default(uuid())
   
-  client      User?       @relation(fields: [clientId], references: [id])
-  clientId    String?     // Может быть null, если заказ от гостя без регистрации
+  client       User?       @relation(fields: [clientId], references: [id])
+  clientId     String?     // Может быть null, если заказ от гостя без регистрации
 
-  customerName String     // Имя заказчика (особенно если без регистрации)
-  phone       String      // Обязательно для связи
+  customerName String      // Имя заказчика (особенно если без регистрации)
+  phone        String      // Обязательно для связи
   
   // Детали с калькулятора
-  serviceType ServiceCategory // Тип услуги
-  width       Float?      // Ширина в метрах (не для всех услуг нужно)
-  height      Float?      // Высота в метрах
-  material    String?     // "Оракал", "Баннер 440г"
-  hasEyelets  Boolean     @default(false) // Люверсы
-  needsMount  Boolean     @default(false) // Нужен монтаж
+  serviceType  ServiceCategory // Тип услуги
+  width        Float?      // Ширина в метрах (не для всех услуг нужно)
+  height       Float?      // Высота в метрах
+  material     String?     // "Оракал", "Баннер 440г"
+  hasEyelets   Boolean     @default(false) // Люверсы
+  needsMount   Boolean     @default(false) // Нужен монтаж
   
-  description String?     // Текстовое поле для сохранения сложных деталей
-  totalPrice  Int         // Итоговая цена в тенге
-  status      OrderStatus @default(NEW)
+  description  String?     // Текстовое поле для сохранения сложных деталей
+  totalPrice   Int         // Итоговая цена в тенге
+  status       OrderStatus @default(NEW)
   
-  expenses    Expense[]   // Расходы, привязанные к этому заказу (себестоимость)
+  expenses     Expense[]   // Расходы, привязанные к этому заказу (себестоимость)
   
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status])
+  @@index([clientId])
+  @@index([createdAt])
 }
 
 // ==========================================
@@ -77,9 +95,11 @@ model Order {
 // ==========================================
 model Setting {
   id        String   @id @default(uuid())
-  key       String   @unique // Например: "calculator_config"
-  value     Json     // Сюда будет сохраняться вся сложная архитектура (формулы, инпуты)
+  key       String   @unique // Например: "calculator_config", "site_theme"
+  value     Json     // Сюда будет сохраняться вся сложная архитектура (формулы, инпуты, глобальные цвета)
   updatedAt DateTime @updatedAt
+
+  @@index([key])
 }
 
 // ==========================================
@@ -107,28 +127,113 @@ model Expense {
   
   orderId   String?
   order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([date])
 }
 
 // ==========================================
-// 7. КОНСТРУКТОР СТРАНИЦ (HEADLESS CMS) 🔥 НОВОЕ
+// 7. УПРАВЛЕНИЕ СТРАНИЦАМИ (DYNAMIC PAGES) 🔥 НОВОЕ
+// ==========================================
+model Page {
+  id              String      @id @default(uuid())
+  slug            String      @unique // URL страницы: "/", "/about", "/portfolio"
+  title           String      // Внутреннее название (для админки)
+  
+  // SEO настройки
+  metaTitle       String?     // Тег <title>
+  metaDescription String?     // Тег <meta name="description">
+  metaKeywords    String?     
+  
+  isPublished     Boolean     @default(true) // Статус публикации
+  
+  blocks          PageBlock[] // Связь: страница состоит из множества блоков
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([slug])
+  @@index([isPublished])
+}
+
+// ==========================================
+// 8. КОНСТРУКТОР БЛОКОВ (HEADLESS CMS ENGINE) 🔥 ОБНОВЛЕНО
 // ==========================================
 model PageBlock {
-  id        String   @id @default(uuid())
-  page      String   @default("home") // К какой странице относится блок (на будущее)
-  type      String   // Тип компонента: "Hero", "Catalog", "FAQ", "Contacts" и т.д.
-  order     Int      @default(0)      // Порядок вывода на странице (Drag & Drop)
-  isActive  Boolean  @default(true)   // Включен / Выключен
-  data      Json     // 🔥 Вся магия здесь: тексты, ссылки, настройки цветов будут лежать в формате JSON
+  id              String   @id @default(uuid())
   
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  pageId          String?  // Жесткая привязка к динамической странице
+  pageRef         Page?    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  
+  page            String   @default("home") // Оставлено для обратной совместимости
+  
+  type            String   // Тип: "Hero", "Slider", "Features", "Calculator"
+  order           Int      @default(0)      // Порядок вывода (Drag & Drop)
+  
+  isActive        Boolean  @default(true)   // Вкл/Выкл блока
+  
+  // 🔥 Глубокая кастомизация видимости (мобильная адаптация)
+  deviceVisibility DeviceVisibility @default(ALL) 
+  
+  // 🔥 Хранение данных (тексты, картинки) и стилей (цвета, отступы, скругления)
+  data            Json     // Контент блока
+  styles          Json?    // Кастомные стили (padding, margin, backgroundColor) генерируемые из админки
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([pageId])
+  @@index([page])
+  @@index([isActive])
+}
+
+// ==========================================
+// 9. МЕДИАБИБЛИОТЕКА (MEDIA LIBRARY) 🔥 НОВОЕ
+// ==========================================
+model MediaLibrary {
+  id          String   @id @default(uuid())
+  filename    String   // Оригинальное имя файла
+  url         String   // Прямая ссылка на файл (Cloudinary / S3 / Local)
+  publicId    String?  // ID провайдера для удаления
+  mimetype    String   // 'image/jpeg', 'video/mp4', 'application/pdf'
+  sizeBytes   Int      // Размер для контроля дискового пространства
+  
+  uploadedBy  String?
+  user        User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+
+  @@index([mimetype])
+}
+
+// ==========================================
+// 10. ЖУРНАЛ АУДИТА (AUDIT LOGS) 🔥 НОВОЕ
+// ==========================================
+model AuditLog {
+  id          String   @id @default(uuid())
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  action      String   // Например: "UPDATE_ORDER", "DELETE_BLOCK", "LOGIN"
+  entityType  String?  // Таблица, в которой произошли изменения ("Order", "PageBlock")
+  entityId    String?  // ID измененной записи
+  
+  details     Json?    // Сохранение разницы (old vs new state)
+  ipAddress   String?  // IP адрес для безопасности
+  
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
 
 // ==========================================
 // ПЕРЕЧИСЛЕНИЯ ДЛЯ СТРОГОЙ ТИПИЗАЦИИ
 // ==========================================
 enum Role {
-  OWNER       // 🔥 Главный босс (может управлять админами)
+  OWNER       // Главный босс (имеет доступ к Audit Logs и финансам)
   ADMIN
   MANAGER
   CLIENT
@@ -153,4 +258,11 @@ enum ServiceCategory {
   METAL_FRAMES    // Металлокаркасы
   POS_MATERIALS   // ПОС материалы
   DESIGN_PRINT    // Дизайн и печать
+}
+
+// 🔥 Управление отображением контента на разных устройствах
+enum DeviceVisibility {
+  ALL
+  MOBILE_ONLY
+  DESKTOP_ONLY
 }
