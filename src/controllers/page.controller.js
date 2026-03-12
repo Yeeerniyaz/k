@@ -22,6 +22,7 @@ const deleteLocalFile = (fileUrl) => {
         
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
+            console.log(`✅ [GC] Локальный файл удален: ${fileName}`);
         }
     } catch (err) {
         console.error(`⚠️ Ошибка при удалении локального файла ${fileUrl}:`, err);
@@ -30,20 +31,14 @@ const deleteLocalFile = (fileUrl) => {
 
 // ==========================================
 // 1. ПОЛУЧИТЬ АКТИВНЫЕ БЛОКИ (ДЛЯ КЛИЕНТОВ НА ФРОНТЕНДЕ)
-// 🔥 SENIOR UPDATE: Обратная совместимость старых и новых страниц
 // ==========================================
 export const getPublicBlocks = catchAsync(async (req, res, next) => {
-    // Поддержка старого фронтенда (где всегда была только home) + нового по slug
     const requestedSlug = req.query.page || "home";
 
-    // 1. Ищем страницу в таблице Page (если она уже создана в новой архитектуре)
     const dynamicPage = await prisma.page.findUnique({
         where: { slug: requestedSlug }
     });
 
-    // 2. Формируем гибкое условие поиска блоков
-    // Мы ищем либо старые блоки (где просто строка page = "home"),
-    // либо новые блоки, привязанные к ID найденной страницы
     const whereCondition = {
         isActive: true,
         OR: [
@@ -55,18 +50,28 @@ export const getPublicBlocks = catchAsync(async (req, res, next) => {
         whereCondition.OR.push({ pageId: dynamicPage.id });
     }
 
-    // 3. Вытаскиваем блоки
     const blocks = await prisma.pageBlock.findMany({
         where: whereCondition,
         orderBy: { order: 'asc' }
     });
 
+    // Распаковываем JSON для фронтенда, чтобы он получал плоские title и subtitle
+    const formattedBlocks = blocks.map(block => {
+        const blockData = typeof block.data === 'string' ? JSON.parse(block.data) : (block.data || {});
+        return {
+            ...block,
+            title: blockData.title || '',
+            subtitle: blockData.subtitle || '',
+            content: blockData.content || '',
+            imageUrl: blockData.imageUrl || ''
+        };
+    });
+
     res.status(200).json({
         success: true,
-        count: blocks.length,
-        // Передаем мета-теги страницы (SEO), если она существует, иначе дефолтные
-        meta: dynamicPage ? { title: dynamicPage.metaTitle, description: dynamicPage.metaDesc } : null,
-        data: blocks
+        count: formattedBlocks.length,
+        meta: dynamicPage ? { title: dynamicPage.metaTitle, description: dynamicPage.metaDescription } : null,
+        data: formattedBlocks
     });
 });
 
@@ -95,22 +100,33 @@ export const getAdminBlocks = catchAsync(async (req, res, next) => {
         orderBy: { order: 'asc' }
     });
 
+    // Подготовка данных для Конструктора в React
+    const formattedBlocks = blocks.map(block => {
+        const blockData = typeof block.data === 'string' ? JSON.parse(block.data) : (block.data || {});
+        return {
+            ...block,
+            title: blockData.title || '',
+            subtitle: blockData.subtitle || '',
+            content: blockData.content || '',
+            imageUrl: blockData.imageUrl || ''
+        };
+    });
+
     res.status(200).json({
         success: true,
-        count: blocks.length,
+        count: formattedBlocks.length,
         pageId: dynamicPage ? dynamicPage.id : null,
-        data: blocks
+        data: formattedBlocks
     });
 });
 
 // ==========================================
 // 3. СОЗДАТЬ НОВЫЙ БЛОК НА СТРАНИЦЕ
-// 🔥 SENIOR UPDATE: Поддержка локальных картинок (uploads)
+// 🔥 SENIOR UPDATE: Упаковка стандартных полей в JSON для Prisma
 // ==========================================
 export const createBlock = catchAsync(async (req, res, next) => {
     const { title, subtitle, content, type, order, page, isActive } = req.body;
 
-    // Определяем, куда привязать блок: к новой Page по ID или к старой строке
     let pageId = null;
     let pageSlug = page || "home";
 
@@ -119,27 +135,28 @@ export const createBlock = catchAsync(async (req, res, next) => {
         pageId = existingPage.id;
     }
 
-    // Обработка загруженного файла через Multer (локально)
-    let imageUrl = '';
+    // Собираем объект, который ляжет в колонку `data` (JSON)
+    const blockData = {
+        title: title || '',
+        subtitle: subtitle || '',
+        content: content || ''
+    };
+
     if (req.file) {
-        imageUrl = `/uploads/${req.file.filename}`;
+        blockData.imageUrl = `/uploads/${req.file.filename}`;
     }
 
     const newBlock = await prisma.pageBlock.create({
         data: {
-            title: title || '',
-            subtitle: subtitle || '',
-            content: content || '',
-            type: type || 'HERO',
-            imageUrl,
+            type: type || 'Hero',
             order: order ? parseInt(order) : 0,
-            isActive: isActive !== undefined ? isActive === 'true' || isActive === true : true,
-            page: pageSlug, // Старое строковое поле для обратной совместимости
-            pageId: pageId  // Новая реляционная связь
+            isActive: isActive !== undefined ? (isActive === 'true' || isActive === true) : true,
+            page: pageSlug,
+            pageId: pageId,
+            data: blockData // Вот тут Prisma счастлива
         }
     });
 
-    // Аудит добавления блока
     if (req.user && req.user.id) {
         prisma.auditLog.create({
             data: {
@@ -160,7 +177,7 @@ export const createBlock = catchAsync(async (req, res, next) => {
 
 // ==========================================
 // 4. ОБНОВИТЬ СУЩЕСТВУЮЩИЙ БЛОК
-// 🔥 SENIOR UPDATE: Garbage Collection для старых фоновых изображений блока
+// 🔥 SENIOR UPDATE: Обновление внутри JSON и удаление старой картинки
 // ==========================================
 export const updateBlock = catchAsync(async (req, res, next) => {
     const { id } = req.params;
@@ -173,29 +190,37 @@ export const updateBlock = catchAsync(async (req, res, next) => {
     }
 
     const updateData = {};
-    if (title !== undefined) updateData.title = title;
-    if (subtitle !== undefined) updateData.subtitle = subtitle;
-    if (content !== undefined) updateData.content = content;
     if (type !== undefined) updateData.type = type;
     if (order !== undefined) updateData.order = parseInt(order);
-    if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
+    if (isActive !== undefined) updateData.isActive = (isActive === 'true' || isActive === true);
 
-    // Если загружена новая картинка (фон блока), удаляем старую
+    // Достаем старый JSON
+    const blockData = typeof existingBlock.data === 'string' ? JSON.parse(existingBlock.data) : (existingBlock.data || {});
+    
+    // Точечно обновляем тексты
+    if (title !== undefined) blockData.title = title;
+    if (subtitle !== undefined) blockData.subtitle = subtitle;
+    if (content !== undefined) blockData.content = content;
+
+    // Если загружена новая картинка, удаляем старую и пишем новый путь
     if (req.file) {
         const newImageUrl = `/uploads/${req.file.filename}`;
-        updateData.imageUrl = newImageUrl;
-
-        if (existingBlock.imageUrl) {
-            deleteLocalFile(existingBlock.imageUrl);
+        
+        if (blockData.imageUrl) {
+            deleteLocalFile(blockData.imageUrl);
         }
+        
+        blockData.imageUrl = newImageUrl;
     }
+
+    // Кладем обновленный JSON обратно
+    updateData.data = blockData;
 
     const updatedBlock = await prisma.pageBlock.update({
         where: { id },
         data: updateData
     });
 
-    // Аудит изменения контента сайта
     if (req.user && req.user.id) {
         prisma.auditLog.create({
             data: {
@@ -216,17 +241,14 @@ export const updateBlock = catchAsync(async (req, res, next) => {
 
 // ==========================================
 // 5. ИЗМЕНИТЬ ПОРЯДОК БЛОКОВ (DRAG & DROP)
-// 🔥 SENIOR UPDATE: Массовое транзакционное обновление
 // ==========================================
 export const updateBlocksOrder = catchAsync(async (req, res, next) => {
-    const { blocks } = req.body; // Ожидаем массив [{ id: "uuid", order: 1 }, { id: "uuid", order: 2 }]
+    const { blocks } = req.body;
 
     if (!blocks || !Array.isArray(blocks)) {
         return next(new AppError('Необходим массив блоков с их новым порядком', 400));
     }
 
-    // Выполняем обновления параллельно через транзакцию Prisma
-    // Это гарантирует, что либо обновятся все блоки, либо ни один
     const transaction = blocks.map(block => 
         prisma.pageBlock.update({
             where: { id: block.id },
@@ -244,7 +266,7 @@ export const updateBlocksOrder = catchAsync(async (req, res, next) => {
 
 // ==========================================
 // 6. УДАЛИТЬ БЛОК
-// 🔥 SENIOR UPDATE: Полное удаление картинок и аудит
+// 🔥 SENIOR UPDATE: Извлекаем imageUrl из JSON перед удалением
 // ==========================================
 export const deleteBlock = catchAsync(async (req, res, next) => {
     const { id } = req.params;
@@ -255,14 +277,15 @@ export const deleteBlock = catchAsync(async (req, res, next) => {
         return next(new AppError('Блок не найден', 404));
     }
 
-    // Удаляем картинку, привязанную к этому блоку
-    if (block.imageUrl) {
-        deleteLocalFile(block.imageUrl);
+    const blockData = typeof block.data === 'string' ? JSON.parse(block.data) : (block.data || {});
+    
+    // Удаляем картинку с диска
+    if (blockData.imageUrl) {
+        deleteLocalFile(blockData.imageUrl);
     }
 
     await prisma.pageBlock.delete({ where: { id } });
 
-    // Аудит удаления
     if (req.user && req.user.id) {
         prisma.auditLog.create({
             data: {
@@ -284,7 +307,6 @@ export const deleteBlock = catchAsync(async (req, res, next) => {
 // ==========================================
 // 7. СУПЕР-АДМИН: УПРАВЛЕНИЕ СТРАНИЦАМИ (SEO И НАВИГАЦИЯ)
 // ==========================================
-// Получить список всех созданных страниц (для меню или роутера фронтенда)
 export const getAllPages = catchAsync(async (req, res, next) => {
     const pages = await prisma.page.findMany({
         orderBy: { createdAt: 'desc' }
@@ -296,7 +318,6 @@ export const getAllPages = catchAsync(async (req, res, next) => {
     });
 });
 
-// Создать новую страницу (например "О нас", "Контакты")
 export const createPage = catchAsync(async (req, res, next) => {
     const { title, slug, metaTitle, metaDesc } = req.body;
 
@@ -311,7 +332,6 @@ export const createPage = catchAsync(async (req, res, next) => {
     res.status(201).json({ success: true, data: newPage });
 });
 
-// Обновить SEO данные страницы
 export const updatePage = catchAsync(async (req, res, next) => {
     const { slug } = req.params;
     const { title, metaTitle, metaDesc, isPublished } = req.body;
