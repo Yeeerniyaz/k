@@ -1,46 +1,51 @@
-// src/routes/media.routes.js
 import express from 'express';
-import { 
-    getAllMedia, 
-    uploadMedia, 
-    deleteMedia 
+import {
+    getAllMedia,
+    uploadMedia,
+    deleteMedia
 } from '../controllers/media.controller.js';
+
+// Подключаем Enterprise-мидлвары для защиты роутов
 import { protect, authorize } from '../middlewares/auth.middleware.js';
 
-// Импортируем настроенный Multer для перехвата form-data
-// Предполагается, что он экспортируется по умолчанию из твоего middleware
-import upload from '../middlewares/upload.middleware.js'; 
+// 🔥 SENIOR IMPORT: Подключаем наш обновленный Multer, который поддерживает 
+// локальное сохранение картинок, PDF и видео (до 50 МБ)
+import upload from '../middlewares/upload.middleware.js';
 
 const router = express.Router();
 
 // ==========================================
-// ГЛОБАЛЬНАЯ ЗАЩИТА МАРШРУТА (MIDDLEWARE)
+// ГЛОБАЛЬНАЯ ЗАЩИТА МАРШРУТОВ (ENTERPRISE ERP)
 // ==========================================
-// 1. Проверяем, что пользователь авторизован (имеет валидный JWT токен)
+// Медиабиблиотека — это административный раздел. 
+// Включаем обязательную проверку JWT-токена для всех запросов.
 router.use(protect);
 
-// 2. Блокируем доступ обычным клиентам (B2B). 
-// Медиабиблиотека — это внутренняя кухня (Headless CMS), туда ходят только сотрудники.
+// 🔥 SENIOR SECURITY: Доступ только для сотрудников компании.
+// Обычным клиентам (CLIENT) или гостям запрещено просматривать 
+// внутренние файлы, прайсы и коммерческие предложения.
 router.use(authorize('OWNER', 'ADMIN', 'MANAGER'));
 
 // ==========================================
-// ENDPOINTS (ТОЧКИ ВХОДА API)
+// 1. ПОЛУЧЕНИЕ И ЗАГРУЗКА ФАЙЛОВ
+// Endpoint: /api/media
 // ==========================================
-
-// GET /api/media 
-// Получить список всех медиафайлов (работает с пагинацией и фильтрами из контроллера)
 router.route('/')
-    .get(getAllMedia);
+    // Получить список всех файлов из папки /uploads (Для отображения галереи в админке)
+    .get(getAllMedia)
 
-// POST /api/media/upload
-// Загрузить один файл. Multer перехватывает поле 'file', сохраняет во временную папку,
-// а дальше контроллер отправляет его в Cloudinary на сжатие (WebP) и пишет в Prisma.
-router.route('/upload')
-    .post(upload.single('file'), uploadMedia);
+    // Загрузить новые файлы на локальный диск сервера
+    // 🔥 SENIOR FEATURE: Используем upload.array('files', 20), чтобы 
+    // менеджер мог выделить мышкой сразу до 20 фотографий/документов и загрузить их за 1 клик.
+    // Multer сам проверит их форматы и сохранит в папку /uploads.
+    .post(upload.array('files', 20), uploadMedia);
 
-// DELETE /api/media/:id
-// Удалить файл из облака и стереть запись о нем из базы данных
-router.route('/:id')
-    .delete(deleteMedia);
+// ==========================================
+// 2. УДАЛЕНИЕ КОНКРЕТНОГО ФАЙЛА
+// Endpoint: /api/media/:fileName
+// ==========================================
+// Удаляет файл физически с диска (Garbage Collection)
+// Доступ разрешен всем сотрудникам (Менеджерам нужно удалять старые макеты)
+router.delete('/:fileName', deleteMedia);
 
 export default router;
