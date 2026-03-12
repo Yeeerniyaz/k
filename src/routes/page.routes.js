@@ -1,60 +1,69 @@
 import express from "express";
 import * as pageController from "../controllers/page.controller.js";
 import { protect, authorize } from '../middlewares/auth.middleware.js';
+import upload from '../middlewares/upload.middleware.js'; // 🔥 SENIOR UPDATE: Добавлена поддержка локальных картинок
 
 const router = express.Router();
 
 // ==========================================
 // 1. ПУБЛИЧНЫЕ РОУТЫ (Доступны всем, без токена)
 // ==========================================
-// Фронтенд (Home.jsx и новые динамические страницы) будет стучаться сюда, чтобы отрисовать сайт
+// Фронтенд (твои компоненты React) будет стучаться сюда, чтобы отрисовать сайт
 router.get("/public", pageController.getPublicBlocks);
 
 // ==========================================
 // 🛡 ЗАЩИЩЕННЫЕ РОУТЫ (MIDDLEWARES)
 // ==========================================
-// Включаем проверку токена для всех роутов ниже
+// Включаем обязательную проверку токена авторизации для всех роутов ниже
 router.use(protect);
 
 // 🔥 SENIOR SECURITY CHECK: Ограничиваем доступ
-// Только создатель (OWNER) имеет право ломать и строить архитектуру страницы
-router.use(authorize("OWNER"));
+// Page Builder — это сердце сайта (его внешний вид и SEO).
+// Только создатель (OWNER) и Администратор (ADMIN) имеют право ломать и строить сайт. 
+// Менеджерам тут делать нечего, их задача — продавать.
+router.use(authorize('OWNER', 'ADMIN'));
 
 // ==========================================
-// 2. УПРАВЛЕНИЕ ДИНАМИЧЕСКИМИ СТРАНИЦАМИ (CMS PAGES) 🔥 НОВОЕ
+// 2. УПРАВЛЕНИЕ СТРАНИЦАМИ (НАВИГАЦИЯ / SEO)
 // ==========================================
-// Роуты для создания и настройки самих страниц (URL slug, Meta-теги, статус публикации)
-router
-    .route("/manage")
-    .get(pageController.getAllPages)      // Получить список всех созданных страниц
-    .post(pageController.createPage);     // Создать новую страницу (например: /promo-2024)
+// Получить список страниц для меню в админке
+router.get("/all", pageController.getAllPages);
 
-router
-    .route("/manage/:id")
-    .patch(pageController.updatePage)     // Обновить SEO или URL страницы
-    .delete(pageController.deletePage);   // Удалить страницу (каскадно удалит и её блоки)
+// Создать новую страницу ("О нас", "Контакты")
+router.post("/create", pageController.createPage);
+
+// Обновить SEO-данные или название конкретной страницы
+router.put("/update/:slug", pageController.updatePage);
 
 // ==========================================
-// 3. УПРАВЛЕНИЕ КОНТЕНТОМ (PAGE BLOCKS) 🔥 ОБНОВЛЕНО
+// 3. PAGE BUILDER: УПРАВЛЕНИЕ БЛОКАМИ
 // ==========================================
-// CRUD для блоков (Сохранена 100% обратная совместимость со старым кодом)
-router
-    .route("/")
-    .get(pageController.getAllBlocks)     // Админка получает все блоки (включая скрытые)
-    .post(pageController.createBlock);    // Создание нового компонента (с поддержкой стилей и мобильной видимости)
+// Получить все блоки для режима редактирования (включая скрытые)
+router.get("/admin/blocks", pageController.getAdminBlocks);
 
-// Специальный роут для сохранения порядка компонентов (Drag & Drop)
-router.post("/reorder", pageController.reorderBlocks);
+// Сохранить новый порядок блоков (Drag & Drop)
+// 🔥 SENIOR NOTE: Транзакция выполнится в контроллере
+router.post("/blocks/reorder", pageController.updateBlocksOrder);
 
-// ==========================================
-// ⚠️ DYNAMIC ID ROUTE (ДОЛЖЕН БЫТЬ В САМОМ НИЗУ)
-// ==========================================
-// Операции с конкретным блоком по ID. 
-// Архитектурное правило: роуты с параметрами (/:id) всегда ставятся последними, 
-// чтобы не перекрыть статические маршруты вроде /reorder или /manage
-router
-    .route("/:id")
-    .patch(pageController.updateBlock)    // Обновление контента (JSON), статуса, видимости или порядка
-    .delete(pageController.deleteBlock);  // Полное удаление блока из базы
+// Добавить новый блок
+// 🔥 SENIOR UPDATE: Добавлено upload.single('image') 
+// Теперь в блок (например, в HERO) можно локально загрузить фоновую картинку
+router.post(
+    "/blocks", 
+    upload.single('image'), 
+    pageController.createBlock
+);
+
+// Редактировать конкретный существующий блок
+// 🔥 SENIOR UPDATE: Также добавлена поддержка загрузки новой картинки 
+// (контроллер сам удалит старую с жесткого диска)
+router.put(
+    "/blocks/:id", 
+    upload.single('image'), 
+    pageController.updateBlock
+);
+
+// Безвозвратно удалить блок (и связанные с ним локальные картинки)
+router.delete("/blocks/:id", pageController.deleteBlock);
 
 export default router;

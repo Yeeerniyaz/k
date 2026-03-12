@@ -27,14 +27,13 @@ const deleteLocalFile = (fileUrl) => {
             fs.unlinkSync(filePath);
         }
     } catch (err) {
-        // Мы логируем ошибку, но не "роняем" сервер, чтобы процесс удаления работы из БД не прервался
+        // Логируем ошибку, но не "роняем" сервер, чтобы удаление из БД не прервалось
         console.error(`⚠️ Ошибка при удалении локального файла ${fileUrl}:`, err);
     }
 };
 
 // ==========================================
 // МАППИНГ КАТЕГОРИЙ (Фронтенд -> Prisma Enum)
-// Оставлено без изменений для обратной совместимости
 // ==========================================
 const categoryMap = {
     'banners': 'BANNERS',
@@ -47,7 +46,6 @@ const categoryMap = {
     'interior': 'INTERIOR'
 };
 
-// Обратный маппинг (Prisma Enum -> Фронтенд)
 const reverseCategoryMap = Object.entries(categoryMap).reduce((acc, [key, value]) => {
     acc[value] = key;
     return acc;
@@ -61,7 +59,7 @@ export const getPortfolio = catchAsync(async (req, res, next) => {
 
     const where = {};
 
-    // Фильтрация по категории, если передана
+    // Фильтрация по категории
     if (category && category !== 'all') {
         const prismaCategory = categoryMap[category];
         if (prismaCategory) {
@@ -69,17 +67,19 @@ export const getPortfolio = catchAsync(async (req, res, next) => {
         }
     }
 
-    // Показываем только видимые работы (для клиентов) или все (для админки)
+    // Фильтрация по видимости
     if (isVisible !== undefined) {
         where.isVisible = isVisible === 'true';
     }
 
     const portfolioItems = await prisma.portfolioItem.findMany({
         where,
-        orderBy: { createdAt: 'desc' }
+        orderBy: {
+            createdAt: 'desc'
+        }
     });
 
-    // Форматируем ответ для старого фронтенда
+    // Форматируем ответ для фронтенда
     const formattedItems = portfolioItems.map(item => ({
         ...item,
         category: reverseCategoryMap[item.category] || item.category
@@ -93,29 +93,56 @@ export const getPortfolio = catchAsync(async (req, res, next) => {
 });
 
 // ==========================================
-// 2. ДОБАВИТЬ НОВУЮ РАБОТУ В ПОРТФОЛИО
-// 🔥 SENIOR UPDATE: Локальное сохранение картинок и Аудит
+// 2. ПОЛУЧИТЬ ОДНУ РАБОТУ ИЗ ПОРТФОЛИО (🔥 ВОССТАНОВЛЕНО)
 // ==========================================
-export const createPortfolio = catchAsync(async (req, res, next) => {
+export const getPortfolioItem = catchAsync(async (req, res, next) => {
+    const { id } = req.params;
+
+    const item = await prisma.portfolioItem.findUnique({
+        where: { id }
+    });
+
+    if (!item) {
+        return next(new AppError('Работа не найдена', 404));
+    }
+
+    // Форматируем категорию для ответа
+    const formattedItem = {
+        ...item,
+        category: reverseCategoryMap[item.category] || item.category
+    };
+
+    res.status(200).json({
+        success: true,
+        data: formattedItem
+    });
+});
+
+// ==========================================
+// 3. ДОБАВИТЬ НОВУЮ РАБОТУ В ПОРТФОЛИО
+// ==========================================
+export const createPortfolioItem = catchAsync(async (req, res, next) => {
     const { title, description, category, clientName, isVisible } = req.body;
 
+    // Проверка обязательных полей
     if (!title || !category) {
         return next(new AppError('Название и категория обязательны', 400));
     }
 
+    // Проверка категории
     const prismaCategory = categoryMap[category];
     if (!prismaCategory) {
         return next(new AppError(`Неверная категория. Доступные: ${Object.keys(categoryMap).join(', ')}`, 400));
     }
 
     // Обрабатываем файлы, сохраненные через multer (локально)
-    let imageUrl = null;
+    let imageUrl = '';
     let images = []; 
 
     // Если загружено несколько файлов (массив)
     if (req.files && req.files.length > 0) {
         images = req.files.map(file => `/uploads/${file.filename}`);
-        imageUrl = images[0]; // Первая картинка становится главной для совместимости
+        imageUrl = images[0]; // Первая картинка становится главной для обратной совместимости
     } 
     // Если загружен только один файл (старый формат)
     else if (req.file) {
@@ -123,6 +150,7 @@ export const createPortfolio = catchAsync(async (req, res, next) => {
         images = [imageUrl];
     }
 
+    // Поле cloudinaryId мы убрали из схемы БД ранее, поэтому сохраняем только локальные URL
     const newItem = await prisma.portfolioItem.create({
         data: {
             title,
@@ -135,7 +163,7 @@ export const createPortfolio = catchAsync(async (req, res, next) => {
         }
     });
 
-    // 🔥 SENIOR SECURITY: Фиксируем добавление работы в AuditLog
+    // Фиксируем создание работы в Аудите
     if (req.user && req.user.id) {
         prisma.auditLog.create({
             data: {
@@ -158,14 +186,17 @@ export const createPortfolio = catchAsync(async (req, res, next) => {
 });
 
 // ==========================================
-// 3. ОБНОВИТЬ СУЩЕСТВУЮЩУЮ РАБОТУ
-// 🔥 SENIOR UPDATE: Зачистка старых файлов при загрузке новых
+// 4. ОБНОВИТЬ СУЩЕСТВУЮЩУЮ РАБОТУ
 // ==========================================
-export const updatePortfolio = catchAsync(async (req, res, next) => {
+export const updatePortfolioItem = catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const { title, description, category, clientName, isVisible } = req.body;
 
-    const existingItem = await prisma.portfolioItem.findUnique({ where: { id } });
+    // Проверяем, существует ли работа
+    const existingItem = await prisma.portfolioItem.findUnique({
+        where: { id }
+    });
+
     if (!existingItem) {
         return next(new AppError('Работа не найдена', 404));
     }
@@ -176,13 +207,16 @@ export const updatePortfolio = catchAsync(async (req, res, next) => {
     if (clientName !== undefined) updateData.clientName = clientName;
     if (isVisible !== undefined) updateData.isVisible = isVisible === 'true' || isVisible === true;
 
+    // Обработка категории
     if (category) {
         const prismaCategory = categoryMap[category];
-        if (!prismaCategory) return next(new AppError('Неверная категория', 400));
+        if (!prismaCategory) {
+            return next(new AppError('Неверная категория', 400));
+        }
         updateData.category = prismaCategory;
     }
 
-    // Если менеджер загрузил НОВЫЕ фотографии, мы удаляем старые с жесткого диска
+    // Обработка нового изображения (или массива изображений)
     if (req.files && req.files.length > 0) {
         const newImages = req.files.map(file => `/uploads/${file.filename}`);
         updateData.imageUrl = newImages[0];
@@ -212,7 +246,7 @@ export const updatePortfolio = catchAsync(async (req, res, next) => {
         data: updateData
     });
 
-    // 🔥 SENIOR SECURITY: Фиксируем редактирование (защита от порчи портфолио)
+    // Фиксируем редактирование в Аудите
     if (req.user && req.user.id) {
         prisma.auditLog.create({
             data: {
@@ -235,28 +269,32 @@ export const updatePortfolio = catchAsync(async (req, res, next) => {
 });
 
 // ==========================================
-// 4. УДАЛИТЬ РАБОТУ ИЗ ПОРТФОЛИО
-// 🔥 SENIOR UPDATE: Полное физическое удаление файлов с диска
+// 5. УДАЛИТЬ РАБОТУ ИЗ ПОРТФОЛИО
 // ==========================================
-export const deletePortfolio = catchAsync(async (req, res, next) => {
+export const deletePortfolioItem = catchAsync(async (req, res, next) => {
     const { id } = req.params;
 
-    const item = await prisma.portfolioItem.findUnique({ where: { id } });
+    const item = await prisma.portfolioItem.findUnique({
+        where: { id }
+    });
+
     if (!item) {
         return next(new AppError('Работа не найдена', 404));
     }
 
-    // 1. Удаляем запись из базы данных
-    await prisma.portfolioItem.delete({ where: { id } });
-
-    // 2. 🔥 Очищаем жесткий диск сервера от связанных файлов
+    // Очищаем жесткий диск сервера от связанных файлов
     if (item.images && item.images.length > 0) {
         item.images.forEach(img => deleteLocalFile(img));
     } else if (item.imageUrl) {
         deleteLocalFile(item.imageUrl);
     }
 
-    // 3. Записываем действие в AuditLog (контроль персонала)
+    // Удаляем запись из базы
+    await prisma.portfolioItem.delete({
+        where: { id }
+    });
+
+    // Записываем действие в AuditLog
     if (req.user && req.user.id) {
         prisma.auditLog.create({
             data: {
