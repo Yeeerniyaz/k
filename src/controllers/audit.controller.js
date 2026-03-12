@@ -1,50 +1,112 @@
-import express from 'express';
-import {
-    getAllLogs,
-    getEntityHistory,
-    rotateLogs
-} from '../controllers/audit.controller.js';
+// src/controllers/audit.controller.js
+import { prisma } from '../server.js';
+import { AppError } from '../utils/AppError.js';
+import { catchAsync } from '../utils/catchAsync.js';
 
-// Подключаем Enterprise-мидлвары для защиты роутов
-import { protect, authorize } from '../middlewares/auth.middleware.js';
-
-const router = express.Router();
 
 // ==========================================
-// ГЛОБАЛЬНАЯ ЗАЩИТА МАРШРУТОВ (TOP SECRET)
+// 1. ПОЛУЧИТЬ СПИСОК ЖУРНАЛОВ АУДИТА (С ФИЛЬТРАЦИЕЙ)
 // ==========================================
-// Журнал аудита — это самая защищенная часть системы.
-// Включаем обязательную проверку JWT-токена.
-router.use(protect);
+export const getAuditLogs = catchAsync(async (req, res) => {
+    // Настройка пагинации (по умолчанию берем по 50 записей, так как логи обычно смотрят большими списками)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
 
-// 🔥 SENIOR SECURITY: Принцип "Owner Only".
-// В крупных ERP-системах только владелец бизнеса имеет доступ к истории действий персонала.
-// Мы ограничиваем доступ ролями OWNER и ADMIN (для техподдержки), 
-// но функции очистки логов ниже будут доступны только OWNER.
-router.use(authorize('OWNER', 'ADMIN'));
+    // 🔥 СЕНЬОРСКИЙ ПОДХОД: Строим динамический объект фильтрации
+    const where = {};
+
+    // Фильтр по конкретному пользователю (кто совершил действие)
+    if (req.query.userId) {
+        where.userId = req.query.userId;
+    }
+
+    // Фильтр по типу действия (например: 'DELETE_ORDER', 'UPLOAD_MEDIA')
+    if (req.query.action) {
+        where.action = req.query.action;
+    }
+
+    // Фильтр по таблице (например: 'Order', 'MediaLibrary', 'PageBlock')
+    if (req.query.entityType) {
+        where.entityType = req.query.entityType;
+    }
+
+    // Фильтр по ID конкретной записи (чтобы посмотреть всю историю изменения одного заказа)
+    if (req.query.entityId) {
+        where.entityId = req.query.entityId;
+    }
+
+    // Фильтр по диапазону дат
+    if (req.query.startDate || req.query.endDate) {
+        where.createdAt = {};
+        if (req.query.startDate) {
+            where.createdAt.gte = new Date(req.query.startDate);
+        }
+        if (req.query.endDate) {
+            where.createdAt.lte = new Date(req.query.endDate);
+        }
+    }
+
+    // Выполняем запросы параллельно для максимальной скорости (Non-blocking I/O)
+    const [logs, total] = await Promise.all([
+        prisma.auditLog.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' }, // Самые свежие события сверху
+            include: {
+                // Подтягиваем данные пользователя, но ТОЛЬКО безопасные поля (без паролей)
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true
+                    }
+                }
+            }
+        }),
+        prisma.auditLog.count({ where })
+    ]);
+
+    res.status(200).json({
+        status: 'success',
+        results: logs.length,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+        data: logs
+    });
+});
 
 // ==========================================
-// 1. ПОЛУЧЕНИЕ ОБЩЕГО ЖУРНАЛА (ДЛЯ МОНИТОРИНГА)
-// Endpoint: GET /api/audit/
+// 2. ПОЛУЧИТЬ ДЕТАЛИ КОНКРЕТНОЙ ЗАПИСИ АУДИТА
 // ==========================================
-// Позволяет просматривать всю активность: входы, удаления, изменения цен.
-// Поддерживает фильтры по дате, пользователю и типу действия.
-router.get('/', getAllLogs);
+export const getAuditLogById = catchAsync(async (req, res, next) => {
+    const { id } = req.params;
 
-// ==========================================
-// 2. ИСТОРИЯ КОНКРЕТНОЙ СУЩНОСТИ
-// Endpoint: GET /api/audit/history/:entityType/:entityId
-// ==========================================
-// Позволяет узнать "судьбу" конкретного заказа или пользователя.
-// Пример: /api/audit/history/Order/uuid-заказа
-router.get('/history/:entityType/:entityId', getEntityHistory);
+    const log = await prisma.auditLog.findUnique({
+        where: { id },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                }
+            }
+        }
+    });
 
-// ==========================================
-// 3. ОБСЛУЖИВАНИЕ БАЗЫ ДАННЫХ (MAINTENANCE)
-// Endpoint: POST /api/audit/rotate
-// ==========================================
-// 🔥 SENIOR SECURITY UPDATE: Только Владелец (OWNER) может очищать логи.
-// Это предотвращает ситуацию, когда админ удаляет записи и "заметает следы", удаляя логи об этом.
-router.post('/rotate', authorize('OWNER'), rotateLogs);
+    if (!log) {
+        return next(new AppError('Запись аудита не найдена', 404));
+    }
 
-export default router;
+    // Здесь фронтенд сможет развернуть поле `details` (Json) и показать, 
+    // какие именно поля заказа или страницы были изменены (old state vs new state)
+    res.status(200).json({
+        status: 'success',
+        data: log
+    });
+});

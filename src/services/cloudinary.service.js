@@ -1,3 +1,4 @@
+// src/services/cloudinary.service.js
 import { v2 as cloudinary } from 'cloudinary';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -23,7 +24,7 @@ cloudinary.config({
 
 // ==========================================
 // 2. ЗАГРУЗКА ФАЙЛА (UPLOAD)
-// 🔥 SENIOR UPDATE: Автоочистка локального диска и поддержка Видео/PDF
+// 🔥 SENIOR UPDATE: Автоочистка локального диска, поддержка Видео/PDF и 🚀 Авто-конвертация в WebP
 // ==========================================
 export const uploadImage = async (filePath, folder = 'royal_banners') => {
     try {
@@ -31,10 +32,16 @@ export const uploadImage = async (filePath, folder = 'royal_banners') => {
         // (image для фото/SVG, video для MP4, raw для PDF/DOCX)
         const result = await cloudinary.uploader.upload(filePath, {
             folder: folder,
-            resource_type: 'auto', 
+            resource_type: 'auto',
             use_filename: true,    // Сохраняем оригинальное имя файла для удобства поиска в админке
             unique_filename: true, // Добавляем рандомный суффикс, чтобы не было конфликтов имен
-            overwrite: false,      
+            overwrite: false,
+
+            // 🔥 SENIOR FIX: Оптимизация изображений на лету
+            // Перекладываем тяжелую работу по сжатию на процессоры Cloudinary.
+            // Картинки автоматически конвертируются в легкий WebP без потери качества.
+            format: 'webp',
+            quality: 'auto'
         });
 
         // 🔥 SENIOR FIX: Оптимизация дискового пространства (Garbage Collection)
@@ -56,7 +63,7 @@ export const uploadImage = async (filePath, folder = 'royal_banners') => {
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }
-        
+
         console.error('💥 Cloudinary Upload Error:', error);
         throw new AppError('Ошибка при загрузке файла в облачное хранилище', 500);
     }
@@ -73,7 +80,7 @@ export const deleteImage = async (publicId, resourceType = 'image') => {
         // В Cloudinary для удаления видео или PDF нужно явно передавать их тип.
         // По умолчанию стоит 'image' для обратной совместимости старого кода.
         const result = await cloudinary.uploader.destroy(publicId, {
-            resource_type: resourceType 
+            resource_type: resourceType
         });
 
         return result;
@@ -88,7 +95,7 @@ export const deleteImage = async (publicId, resourceType = 'image') => {
 };
 
 // ==========================================
-// 4. МАССОВАЯ ЗАГРУЗКА ФАЙЛОВ (BATCH UPLOAD) 🔥 НОВОЕ
+// 4. МАССОВАЯ ЗАГРУЗКА ФАЙЛОВ (BATCH UPLOAD)
 // Экстремально быстрая загрузка галереи для портфолио
 // ==========================================
 export const uploadMultipleImages = async (filePaths, folder = 'royal_banners') => {
@@ -97,7 +104,7 @@ export const uploadMultipleImages = async (filePaths, folder = 'royal_banners') 
         // Это ускоряет загрузку 10 фотографий в 5-6 раз.
         const uploadPromises = filePaths.map(filePath => uploadImage(filePath, folder));
         const results = await Promise.all(uploadPromises);
-        
+
         return results;
     } catch (error) {
         console.error('💥 Cloudinary Batch Upload Error:', error);
