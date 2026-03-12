@@ -3,7 +3,7 @@ version: '3.8'
 services:
   royal-banners-api:
     build: .
-    container_name: royal-banners-api
+    container_name: r-banners-api
     restart: always
     environment:
       - PORT=5005
