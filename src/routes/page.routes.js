@@ -1,6 +1,6 @@
 import express from "express";
 import * as pageController from "../controllers/page.controller.js";
-import { protect, restrictTo } from "../middlewares/auth.middleware.js";
+import { protect, authorize } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -18,7 +18,7 @@ router.use(protect);
 
 // 🔥 SENIOR SECURITY CHECK: Ограничиваем доступ
 // Только создатель (OWNER) имеет право ломать и строить архитектуру страницы
-router.use(restrictTo("OWNER"));
+router.use(authorize("OWNER"));
 
 // CRUD для блоков
 router

@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import catchAsync from "../utils/catchAsync.js";
-import AppError from "../utils/AppError.js";
+import {catchAsync} from "../utils/catchAsync.js";
+import {AppError} from "../utils/AppError.js";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -30,7 +30,7 @@ export const getAllUsers = catchAsync(async (req, res, next) => {
 // ==========================================
 // 2. ПОЛУЧИТЬ ОДНОГО ПОЛЬЗОВАТЕЛЯ
 // ==========================================
-export const getUser = catchAsync(async (req, res, next) => {
+export const getUsers = catchAsync(async (req, res, next) => {
     const user = await prisma.user.findUnique({
         where: { id: req.params.id },
         select: {

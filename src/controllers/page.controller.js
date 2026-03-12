@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import catchAsync from "../utils/catchAsync.js";
-import AppError from "../utils/AppError.js";
+import {catchAsync} from "../utils/catchAsync.js";
+import {AppError} from "../utils/AppError.js";
 
 const prisma = new PrismaClient();
 
