@@ -1,9 +1,7 @@
-import { PrismaClient } from "@prisma/client";
-import {catchAsync} from "../utils/catchAsync.js";
-import {AppError} from "../utils/AppError.js";
+import { prisma } from "../utils/prisma.js";
+import { catchAsync } from "../utils/catchAsync.js";
+import { AppError } from "../utils/AppError.js";
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
 
 // ==========================================
 // 1. ПОЛУЧИТЬ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
