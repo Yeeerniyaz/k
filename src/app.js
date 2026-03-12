@@ -33,7 +33,13 @@ const app = express();
 
 // Включаем CORS для связи React-фронтенда с нашим Node.js бэкендом
 app.use(cors({
-    origin: process.env.CLIENT_URL || '*', 
+    // 🔥 SENIOR FIX: Обязательно указываем протокол (https:// или http://)
+    // Можно передать массив, если сайт доступен по обоим протоколам или с www.
+    origin: [
+        "https://ukb.yeee.kz",
+        "https://admin.yeee.kz",
+        "https://test.yeee.kz"
+    ], 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']

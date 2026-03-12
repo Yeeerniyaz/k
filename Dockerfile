@@ -1,12 +1,3 @@
-# ==========================================
-# 1-КЕЗЕҢ: ФРОНТЕНДТІ ЖИНАУ
-# ==========================================
-FROM node:22-slim AS frontend-builder
-WORKDIR /build/client
-COPY client/package*.json ./
-RUN npm install
-COPY client/ ./
-RUN npm run build
 
 # ==========================================
 # 2-КЕЗЕҢ: БЭКЕНДТІ ДАЙЫНДАУ
@@ -30,9 +21,7 @@ RUN npx prisma generate
 # ЕНДІ ҒАНА продакшн режимді қосамыз
 ENV NODE_ENV=production
 
-# Кодты және жиналған фронтендті көшіру
-COPY . .
-COPY --from=frontend-builder /build/client/dist ./client/dist
+
 
 EXPOSE 5005
 CMD ["npm", "start"]
