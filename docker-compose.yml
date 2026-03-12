@@ -6,7 +6,7 @@ services:
     container_name: r-banners-api
     restart: always
     environment:
-      - PORT=5005
+      - PORT=5505
       - NODE_ENV=production
       - DATABASE_URL=postgresql://yeee:Qazplm01@datebase:5432/royal_banners?schema=public
       - JWT_SECRET=${JWT_SECRET}
@@ -14,7 +14,7 @@ services:
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
       - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
     ports:
-      - "5005:5005"
+      - "5505:5505"
     networks:
       - shared_db_network
 
