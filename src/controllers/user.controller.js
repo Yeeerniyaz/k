@@ -1,4 +1,4 @@
-import { prisma } from "../utils/prisma.js";
+import { prisma } from '../server.js';
 import { catchAsync } from "../utils/catchAsync.js";
 import { AppError } from "../utils/AppError.js";
 import bcrypt from "bcryptjs";
