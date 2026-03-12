@@ -32,7 +32,6 @@ model Portfolio {
   id          String   @id @default(uuid())
   title       String   // "Вывеска для GLOBAL DENT"
   category    ServiceCategory // "BANNERS", "METAL_FRAMES" и т.д.
-  
   // 🔥 SENIOR UPDATE: Теперь это МАССИВЫ строк, чтобы хранить несколько фото!
   imageUrls   String[] 
   publicIds   String[] 
@@ -91,6 +90,7 @@ model Price {
   service   String   @unique // Например: "Печать баннера 340гр"
   unit      String   // "1 кв.м"
   price     Int      // Стоимость в тенге
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -110,9 +110,25 @@ model Expense {
 }
 
 // ==========================================
+// 7. КОНСТРУКТОР СТРАНИЦ (HEADLESS CMS) 🔥 НОВОЕ
+// ==========================================
+model PageBlock {
+  id        String   @id @default(uuid())
+  page      String   @default("home") // К какой странице относится блок (на будущее)
+  type      String   // Тип компонента: "Hero", "Catalog", "FAQ", "Contacts" и т.д.
+  order     Int      @default(0)      // Порядок вывода на странице (Drag & Drop)
+  isActive  Boolean  @default(true)   // Включен / Выключен
+  data      Json     // 🔥 Вся магия здесь: тексты, ссылки, настройки цветов будут лежать в формате JSON
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
 // ПЕРЕЧИСЛЕНИЯ ДЛЯ СТРОГОЙ ТИПИЗАЦИИ
 // ==========================================
 enum Role {
+  OWNER       // 🔥 Главный босс (может управлять админами)
   ADMIN
   MANAGER
   CLIENT
