@@ -1,27 +1,31 @@
-
 # ==========================================
 # 2-КЕЗЕҢ: БЭКЕНДТІ ДАЙЫНДАУ
 # ==========================================
 FROM node:22-slim
+
 # Prisma-ға OpenSSL міндетті түрде керек
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
+# 🔥 SENIOR FIX 1: WORKDIR тек папка болуы керек!
 WORKDIR /app
 
-# Конфигтерді көшіру
+# Алдымен конфигтерді көшіреміз
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# 🔥 МАҢЫЗДЫ: Алдымен барлық пакеттерді орнатамыз (Dev-пакеттермен бірге)
+# 🔥 SENIOR FIX 2: ЕҢ МАҢЫЗДЫ ҚАДАМ - БАРЛЫҚ КОДТЫ (src) КӨШІРУ!
+# Бұл болмаса, сервер ешқашан қосылмайды.
+COPY . .
+
+# Dev-пакеттермен бірге орнатамыз
 RUN npm install
 
-# 🔥 МАҢЫЗДЫ: Присманы генерация жасаймыз
+# Prisma клиентін генерациялаймыз
 RUN npx prisma generate
 
-# ЕНДІ ҒАНА продакшн режимді қосамыз
+# Енді ғана продакшн режимді қосамыз
 ENV NODE_ENV=production
 
+EXPOSE 5505
 
-
-EXPOSE 5005
 CMD ["npm", "start"]
