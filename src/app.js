@@ -32,14 +32,16 @@ const app = express();
 // ==========================================
 
 // Включаем CORS для связи React-фронтенда с нашим Node.js бэкендом
+// 🔥 SENIOR FIX: Формируем массив и очищаем его от undefined / null
+const allowedOrigins = [
+    "https://ukb.yeee.kz",
+    "https://admin.yeee.kz",
+    "https://test.yeee.kz",
+    process.env.DEV_HOST
+].filter(Boolean);
+
 app.use(cors({
-    // 🔥 SENIOR FIX: Обязательно указываем протокол (https:// или http://)
-    // Можно передать массив, если сайт доступен по обоим протоколам или с www.
-    origin: [
-        "https://ukb.yeee.kz",
-        "https://admin.yeee.kz",
-        "https://test.yeee.kz"
-    ], 
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
