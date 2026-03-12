@@ -10,11 +10,16 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://yeee:Qazplm01@datebase:5432/royal_banners?schema=public
       - JWT_SECRET=${JWT_SECRET}
-      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
-      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
-      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      # 🔥 SENIOR CLEANUP: Cloudinary айнымалыларын алып тастадық, 
+      # өйткені біз толығымен локальный SSD дискке көштік.
     ports:
       - "5505:5505"
+    # 🔥 SENIOR SECURITY (ФАЙЛДАРДЫ ҚОРҒАУ): 
+    # Осы қатардың арқасында барлық жүктелген суреттер мен файлдар 
+    # сервердің өзінде (./uploads папкасында) мәңгі сақталады. 
+    # Docker өшірілсе де, файлдар аман қалады!
+    volumes:
+      - ./uploads:/app/uploads
     networks:
       - shared_db_network
 
