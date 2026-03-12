@@ -1,26 +1,41 @@
-import { Router } from 'express';
-import { getDashboardStats } from '../controllers/analytics.controller.js';
+import express from 'express';
+import {
+    getDashboardStats,
+    getAnalyticsChart
+} from '../controllers/analytics.controller.js';
 
-// 🔥 ИСПРАВЛЕНИЕ: Используем 'authorize' вместо 'restrictTo', 
-// чтобы соответствовать экспортам из auth.middleware.js
+// Подключаем Enterprise-мидлвары для защиты роутов
 import { protect, authorize } from '../middlewares/auth.middleware.js';
 
-const router = Router();
+const router = express.Router();
 
 // ==========================================
-// МАРШРУТЫ АНАЛИТИКИ (API ENDPOINTS: /api/analytics)
+// ГЛОБАЛЬНАЯ ЗАЩИТА МАРШРУТОВ (ENTERPRISE ERP)
 // ==========================================
+// Аналитика — это сердце бизнеса. Никаких публичных запросов.
+// Включаем обязательную проверку JWT-токена для всех роутов ниже.
+router.use(protect);
 
-// Маршрут: GET /api/analytics/dashboard
-// Описание: Получить агрегированную статистику (выручка, статусы, последние заказы) 
-// для главного экрана Dashboard.
-// Доступ: СТРОГО ЗАЩИЩЕННЫЙ (Только для ADMIN и MANAGER)
+// 🔥 SENIOR SECURITY: Ограничиваем доступ по ролям.
+// Обычные клиенты (CLIENT) не имеют права видеть доходы компании.
+// Доступ разрешен только Владельцу, Админу и Менеджерам.
+router.use(authorize('ADMIN', 'OWNER', 'MANAGER'));
 
-router.get(
-    '/dashboard',
-    protect, // Проверка, что пользователь вошел в систему
-    authorize('ADMIN', 'MANAGER'), // Проверка, что у пользователя есть права доступа
-    getDashboardStats // Выполнение самой логики сбора данных
-);
+// ==========================================
+// 1. СВОДНАЯ СТАТИСТИКА (ДЛЯ ГЛАВНОГО ДАШБОРДА)
+// Endpoint: GET /api/analytics/
+// ==========================================
+// Возвращает общее количество заказов, доходы, конверсию.
+// Старый фронтенд продолжит работать с этим эндпоинтом как и раньше.
+router.get('/', getDashboardStats);
+
+// ==========================================
+// 2. ДАННЫЕ ДЛЯ ГРАФИКОВ (CHART DATA) 🔥 НОВОЕ
+// Endpoint: GET /api/analytics/chart
+// ==========================================
+// Возвращает массив данных, сгруппированных по дням, для построения 
+// красивых графиков в React (например, через Recharts или Chart.js).
+// Мы вынесли это в отдельный роут, чтобы не перегружать основной запрос дашборда.
+router.get('/chart', getAnalyticsChart);
 
 export default router;

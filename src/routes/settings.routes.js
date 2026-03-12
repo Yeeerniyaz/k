@@ -2,34 +2,60 @@ import express from 'express';
 import { 
     getCalculatorSettings, 
     updateCalculatorSettings,
+    getAllSettings,
     getSettingByKey,
-    deleteSetting
+    upsertSettingByKey
 } from '../controllers/settings.controller.js';
 
-// 🔥 FIX: restrictTo орнына authorize деп импорттаймыз
 import { protect, authorize } from '../middlewares/auth.middleware.js'; 
 
 const router = express.Router();
 
 // ==========================================
-// ПУБЛИЧНЫЕ МАРШРУТЫ (Открыты для всех клиентов)
+// 1. ПУБЛИЧНЫЕ МАРШРУТЫ (ОТКРЫТЫ ДЛЯ FRONTEND)
 // ==========================================
-// Получение конфигурации калькулятора для работы витрины
+
+// 🔥 ИЗОЛИРОВАННАЯ ЗОНА КАЛЬКУЛЯТОРА
+// Фронтенд калькулятора стучится сюда, чтобы получить цены и формулы.
+// Этот маршрут полностью отрезан от остальных настроек.
 router.get('/calculator', getCalculatorSettings);
 
+// ЗОНА HEADLESS CMS (ЧТЕНИЕ)
+// Фронтенд стучится сюда, чтобы получить любые другие данные по ключу 
+// (например: /api/settings/cms/site_theme или /api/settings/cms/contacts)
+router.get('/cms/:key', getSettingByKey);
+
 // ==========================================
-// ЗАЩИЩЕННЫЕ МАРШРУТЫ (Только для Super Admin)
+// 2. ЗАЩИЩЕННЫЕ МАРШРУТЫ (УПРАВЛЕНИЕ ИЗ АДМИНКИ)
 // ==========================================
-// Включаем защиту: нужен токен и роль ADMIN
+// Включаем обязательную проверку токена для всех роутов ниже
 router.use(protect);
-router.use(authorize('ADMIN')); // 🔥 FIX: restrictTo орнына authorize қолданамыз
 
-// Сохранение / Обновление калькулятора
-router.post('/calculator', updateCalculatorSettings);
+// 🔥 ИЗОЛИРОВАННАЯ ЗОНА КАЛЬКУЛЯТОРА (ОБНОВЛЕНИЕ)
+// Права на изменение цен и формул есть ТОЛЬКО у владельца и админа. 
+// Менеджерам сюда доступ закрыт (защита от махинаций с ценами).
+router.put(
+    '/calculator', 
+    authorize('ADMIN', 'OWNER'), 
+    updateCalculatorSettings
+);
 
-// Универсальные CRUD-методы для любых других настроек по ключу (например: /api/settings/contacts)
-router.route('/:key')
-    .get(getSettingByKey)
-    .delete(deleteSetting);
+// ==========================================
+// 3. УПРАВЛЕНИЕ ДВИЖКОМ HEADLESS CMS (ДЛЯ АДМИНКИ)
+// ==========================================
+
+// Получить абсолютно все настройки списком (для дашборда разработчика/админа)
+router.get(
+    '/', 
+    authorize('ADMIN', 'OWNER', 'MANAGER'), 
+    getAllSettings
+);
+
+// Создать или обновить любую кастомную настройку (цвета, тексты, SEO)
+router.put(
+    '/cms/:key', 
+    authorize('ADMIN', 'OWNER'), 
+    upsertSettingByKey
+);
 
 export default router;

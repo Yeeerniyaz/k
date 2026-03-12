@@ -1,108 +1,202 @@
-import { prisma } from '../server.js'; // 🔥 СЕНЬОРСКАЯ ПРАКТИКА: Используем единый инстанс БД
-// 🔥 СЕНЬОРСКИЕ УТИЛИТЫ:
+import { prisma } from '../server.js';
 import { catchAsync } from '../utils/catchAsync.js';
 import { AppError } from '../utils/AppError.js';
 
 // ==========================================
-// 1. ПОЛУЧЕНИЕ ВСЕГО ПРАЙС-ЛИСТА
+// 1. ПОЛУЧИТЬ ВЕСЬ ПРАЙС-ЛИСТ (ДЛЯ КАЛЬКУЛЯТОРА И АДМИНКИ)
 // ==========================================
-// Барлық прайс-листі алу
 export const getPrices = catchAsync(async (req, res, next) => {
     const prices = await prisma.price.findMany({
-        orderBy: { service: 'asc' } // Сортировка по алфавиту
+        orderBy: {
+            createdAt: 'asc' // Сортируем по порядку добавления
+        }
     });
 
     res.status(200).json({
-        success: true,
-        status: 'success', // Поддержка обоих стандартов ответа для совместимости с фронтендом
+        status: 'success',
         results: prices.length,
         data: prices
     });
 });
 
 // ==========================================
-// 2. ДОБАВЛЕНИЕ НОВОЙ ПОЗИЦИИ В ПРАЙС
+// 2. ПОЛУЧИТЬ ОДНУ ПОЗИЦИЮ (ДЛЯ РЕДАКТИРОВАНИЯ И ПРОВЕРКИ)
 // ==========================================
-// Жаңа баға позициясын қосу
+export const getPriceById = catchAsync(async (req, res, next) => {
+    const { id } = req.params;
+
+    const price = await prisma.price.findUnique({
+        where: { id }
+    });
+
+    if (!price) {
+        return next(new AppError('Позиция в прайсе не найдена', 404));
+    }
+
+    res.status(200).json({
+        status: 'success',
+        data: price
+    });
+});
+
+// ==========================================
+// 3. ДОБАВИТЬ НОВУЮ УСЛУГУ В ПРАЙС-ЛИСТ
+// 🔥 SENIOR UPDATE: Защита данных и Аудит действий
+// ==========================================
 export const createPrice = catchAsync(async (req, res, next) => {
     const { service, unit, price } = req.body;
 
-    // Валидация входных данных
     if (!service || !unit || price === undefined) {
-        return next(new AppError('Необходимо указать наименование (service), единицу измерения (unit) и цену (price)', 400));
+        return next(new AppError('Пожалуйста, заполните все обязательные поля: название (service), единицы (unit) и цену (price)', 400));
     }
 
-    // Қызметтің бар-жоғын тексеру (Проверка на дубликаты)
-    const existing = await prisma.price.findUnique({ where: { service } });
-    if (existing) {
-        return next(new AppError('Мұндай қызмет прайста бар / Такая услуга уже существует', 400));
+    // 1. Защита БД: Проверка на уникальность названия услуги (чтобы не было дублей в калькуляторе)
+    const existingService = await prisma.price.findUnique({
+        where: { service }
+    });
+
+    if (existingService) {
+        return next(new AppError(`Услуга с названием "${service}" уже существует в прайс-листе`, 400));
     }
 
+    // 2. Валидация финансов: цена не может быть отрицательной
+    const parsedPrice = parseInt(price);
+    if (parsedPrice < 0) {
+        return next(new AppError('Цена не может быть отрицательной', 400));
+    }
+
+    // 3. Сохранение в базу
     const newPrice = await prisma.price.create({
         data: {
             service,
             unit,
-            price: parseInt(price, 10)
+            price: parsedPrice
         }
     });
 
+    // 🔥 SENIOR SECURITY: Фиксируем добавление новой расценки в ERP
+    if (req.user && req.user.id) {
+        prisma.auditLog.create({
+            data: {
+                userId: req.user.id,
+                action: "CREATE_PRICE_ITEM",
+                entityType: "Price",
+                entityId: newPrice.id,
+                details: { service: newPrice.service, price: newPrice.price }
+            }
+        }).catch(console.error);
+    }
+
     res.status(201).json({
-        success: true,
         status: 'success',
-        message: 'Позиция успешно добавлена в прайс-лист',
         data: newPrice
     });
 });
 
 // ==========================================
-// 3. ОБНОВЛЕНИЕ СУЩЕСТВУЮЩЕЦ ЦЕНЫ
+// 4. ОБНОВИТЬ СУЩЕСТВУЮЩУЮ ПОЗИЦИЮ (СМЕНА ЦЕНЫ)
+// 🔥 SENIOR UPDATE: Логирование изменения цен для защиты от махинаций
 // ==========================================
-// Бағаны жаңарту
 export const updatePrice = catchAsync(async (req, res, next) => {
     const { id } = req.params;
     const { service, unit, price } = req.body;
 
-    // Смарт-проверка: существует ли запись перед обновлением?
-    const existingPrice = await prisma.price.findUnique({ where: { id } });
-    if (!existingPrice) {
-        return next(new AppError('Позиция не найдена (возможно, она была удалена ранее)', 404));
-    }
-
-    const updatedPrice = await prisma.price.update({
-        where: { id },
-        data: {
-            service: service !== undefined ? service : undefined,
-            unit: unit !== undefined ? unit : undefined,
-            price: price !== undefined ? parseInt(price, 10) : undefined
-        }
+    const existingPriceItem = await prisma.price.findUnique({
+        where: { id }
     });
 
+    if (!existingPriceItem) {
+        return next(new AppError('Позиция в прайсе не найдена', 404));
+    }
+
+    // Собираем объект обновления
+    const updateData = {};
+    if (service && service !== existingPriceItem.service) {
+        // Если меняют название, проверяем чтобы оно не совпало с другим существующим
+        const nameCheck = await prisma.price.findUnique({ where: { service } });
+        if (nameCheck) return next(new AppError(`Услуга "${service}" уже существует`, 400));
+        updateData.service = service;
+    }
+    if (unit) updateData.unit = unit;
+    
+    if (price !== undefined) {
+        const parsedPrice = parseInt(price);
+        if (parsedPrice < 0) return next(new AppError('Цена не может быть отрицательной', 400));
+        updateData.price = parsedPrice;
+    }
+
+    // Обновляем в БД
+    const updatedPrice = await prisma.price.update({
+        where: { id },
+        data: updateData
+    });
+
+    // 🔥 SENIOR SECURITY: Жесткий контроль изменения прайса!
+    if (req.user && req.user.id) {
+        const detailsLog = {};
+        // Записываем старую и новую цену, если был факт изменения
+        if (updateData.price !== undefined && updateData.price !== existingPriceItem.price) {
+            detailsLog.oldPrice = existingPriceItem.price;
+            detailsLog.newPrice = updateData.price;
+        }
+        if (updateData.service && updateData.service !== existingPriceItem.service) {
+            detailsLog.oldService = existingPriceItem.service;
+            detailsLog.newService = updateData.service;
+        }
+
+        if (Object.keys(detailsLog).length > 0) {
+            prisma.auditLog.create({
+                data: {
+                    userId: req.user.id,
+                    action: "UPDATE_PRICE_ITEM",
+                    entityType: "Price",
+                    entityId: updatedPrice.id,
+                    details: detailsLog
+                }
+            }).catch(console.error);
+        }
+    }
+
     res.status(200).json({
-        success: true,
         status: 'success',
-        message: 'Прайс-лист успешно обновлен',
         data: updatedPrice
     });
 });
 
 // ==========================================
-// 4. УДАЛЕНИЕ ПОЗИЦИИ ИЗ ПРАЙС-ЛИСТА
+// 5. УДАЛИТЬ ПОЗИЦИЮ ИЗ ПРАЙС-ЛИСТА
+// 🔥 SENIOR UPDATE: Аудит удаления услуги
 // ==========================================
-// Позицияны өшіру
 export const deletePrice = catchAsync(async (req, res, next) => {
     const { id } = req.params;
 
-    // Проверяем существование, чтобы избежать фатальной ошибки БД (RecordNotFound)
-    const existingPrice = await prisma.price.findUnique({ where: { id } });
-    if (!existingPrice) {
-        return next(new AppError('Позиция не найдена или уже удалена', 404));
+    const price = await prisma.price.findUnique({
+        where: { id }
+    });
+
+    if (!price) {
+        return next(new AppError('Позиция в прайсе не найдена', 404));
     }
 
-    await prisma.price.delete({ where: { id } });
+    await prisma.price.delete({
+        where: { id }
+    });
 
-    res.status(200).json({
-        success: true,
+    // 🔥 SENIOR SECURITY: Фиксируем удаление из прайса (во избежание саботажа)
+    if (req.user && req.user.id) {
+        prisma.auditLog.create({
+            data: {
+                userId: req.user.id,
+                action: "DELETE_PRICE_ITEM",
+                entityType: "Price",
+                entityId: id,
+                details: { deletedService: price.service, deletedPrice: price.price }
+            }
+        }).catch(console.error);
+    }
+
+    res.status(204).json({
         status: 'success',
-        message: 'Позиция прайс-листтен өшірілді / Позиция удалена из прайс-листа'
+        data: null
     });
 });
