@@ -14,6 +14,7 @@ import portfolioRoutes from './routes/portfolio.routes.js';
 import financeRoutes from './routes/finance.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
+import pageRoutes from './routes/page.routes.js'; // 🔥 Добавлен роут для конструктора страниц (CMS)
 
 // Импортируем наш глобальный перехватчик ошибок
 import { errorHandler } from './middlewares/error.middleware.js';
@@ -83,6 +84,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/pages', pageRoutes); // 🔥 Подключили роуты конструктора страниц (Headless CMS)
 
 // ==========================================
 // 3. РАЗДАЧА FRONTEND (REACT CLIENT)
