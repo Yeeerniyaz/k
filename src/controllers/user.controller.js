@@ -1,159 +1,159 @@
-import { prisma } from '../server.js';
-import bcrypt from 'bcryptjs'; // Парольдерді қауіпсіз сақтау үшін
-// 🔥 ДОБАВЛЕНО: Импорт сеньорских утилит для обработки ошибок
-import { catchAsync } from '../utils/catchAsync.js';
-import { AppError } from '../utils/AppError.js';
+import { PrismaClient } from "@prisma/client";
+import catchAsync from "../utils/catchAsync.js";
+import AppError from "../utils/AppError.js";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
 
 // ==========================================
-// 1. ПОЛУЧЕНИЕ ВСЕХ СОТРУДНИКОВ
+// 1. ПОЛУЧИТЬ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
 // ==========================================
-export const getUsers = catchAsync(async (req, res, next) => {
+export const getAllUsers = catchAsync(async (req, res, next) => {
     const users = await prisma.user.findMany({
-        orderBy: { createdAt: 'desc' },
-        // 🔥 СЕНЬОРСКАЯ ФИЧА: Никогда не возвращаем пароли на фронтенд!
         select: {
             id: true,
-            name: true,
             email: true,
-            phone: true, // Новый телефонный номер
+            name: true,
             role: true,
+            phone: true,
             createdAt: true,
-            updatedAt: true
         }
     });
 
     res.status(200).json({
-        status: 'success',
-        success: true, // Поддержка старого и нового форматов
-        data: users
+        status: "success",
+        results: users.length,
+        data: { users }
     });
 });
 
 // ==========================================
-// 2. СОЗДАНИЕ НОВОГО СОТРУДНИКА
+// 2. ПОЛУЧИТЬ ОДНОГО ПОЛЬЗОВАТЕЛЯ
 // ==========================================
-export const createUser = catchAsync(async (req, res, next) => {
-    const { name, email, phone, password, role } = req.body;
-
-    // Базовая валидация: используем AppError вместо ручного возврата
-    if (!email || !password) {
-        return next(new AppError('Email и пароль обязательны', 400));
-    }
-
-    // Проверка: не занят ли email другим менеджером
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-        return next(new AppError('Пользователь с таким email уже существует', 400));
-    }
-
-    // Шифруем пароль (Соль 10 раундов)
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = await prisma.user.create({
-        data: {
-            name: name || 'Без имени',
-            email,
-            phone: phone || null, // Записываем телефон
-            password: hashedPassword,
-            role: role || 'MANAGER'
-        },
-        // Снова возвращаем без пароля
+export const getUser = catchAsync(async (req, res, next) => {
+    const user = await prisma.user.findUnique({
+        where: { id: req.params.id },
         select: {
             id: true,
-            name: true,
             email: true,
-            phone: true,
+            name: true,
             role: true,
+            phone: true,
             createdAt: true
         }
     });
 
-    res.status(201).json({
-        status: 'success',
-        success: true,
-        message: 'Сотрудник успешно добавлен',
-        data: newUser
+    if (!user) {
+        return next(new AppError("Пользователь не найден", 404));
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: { user }
     });
 });
 
 // ==========================================
-// 3. ОБНОВЛЕНИЕ ДАННЫХ СОТРУДНИКА
+// 3. СОЗДАТЬ ПОЛЬЗОВАТЕЛЯ (ИЗ АДМИНКИ)
+// ==========================================
+export const createUser = catchAsync(async (req, res, next) => {
+    const { email, password, name, phone, role } = req.body;
+
+    // 🔥 SENIOR SECURITY CHECK: Защита иерархии
+    // Если пытаются создать ADMIN или OWNER, это может сделать ТОЛЬКО OWNER
+    if ((role === 'ADMIN' || role === 'OWNER') && req.user.role !== 'OWNER') {
+        return next(new AppError("Остынь, хакер. Только OWNER может назначать администраторов.", 403));
+    }
+
+    // Хэшируем пароль перед сохранением в базу
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const newUser = await prisma.user.create({
+        data: {
+            email,
+            password: hashedPassword,
+            name,
+            phone,
+            role: role || 'CLIENT'
+        },
+        // Не возвращаем хэш пароля клиенту
+        select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            phone: true
+        }
+    });
+
+    res.status(201).json({
+        status: "success",
+        data: { user: newUser }
+    });
+});
+
+// ==========================================
+// 4. ОБНОВИТЬ ПОЛЬЗОВАТЕЛЯ
 // ==========================================
 export const updateUser = catchAsync(async (req, res, next) => {
-    const { id } = req.params;
-    const { name, email, phone, role, password } = req.body;
+    const { name, phone, role } = req.body;
 
-    // Смарт-проверка: существует ли пользователь?
-    const existingUser = await prisma.user.findUnique({ where: { id } });
-    if (!existingUser) {
-        return next(new AppError('Сотрудник не найден', 404));
+    const userToUpdate = await prisma.user.findUnique({
+        where: { id: req.params.id }
+    });
+
+    if (!userToUpdate) {
+        return next(new AppError("Пользователь не найден", 404));
     }
 
-    // Если меняют email, нужно убедиться, что он свободен
-    if (email && email !== existingUser.email) {
-        const emailTaken = await prisma.user.findUnique({ where: { email } });
-        if (emailTaken) {
-            return next(new AppError('Этот email уже используется', 400));
+    // 🔥 SENIOR SECURITY CHECK: Защита изменения ролей
+    // Проверяем, если роль меняется, и это затрагивает ADMIN или OWNER
+    if (role && role !== userToUpdate.role) {
+        if ((role === 'ADMIN' || role === 'OWNER' || userToUpdate.role === 'ADMIN' || userToUpdate.role === 'OWNER') && req.user.role !== 'OWNER') {
+            return next(new AppError("У тебя нет прав менять роли уровня ADMIN или OWNER.", 403));
         }
-    }
-
-    // Формируем объект с новыми данными
-    const updateData = {
-        name: name !== undefined ? name : undefined,
-        email: email !== undefined ? email : undefined,
-        phone: phone !== undefined ? phone : undefined, // Обновляем телефон
-        role: role !== undefined ? role : undefined,
-    };
-
-    // Если администратор задал новый пароль — шифруем его
-    if (password && password.trim() !== '') {
-        const salt = await bcrypt.genSalt(10);
-        updateData.password = await bcrypt.hash(password, salt);
     }
 
     const updatedUser = await prisma.user.update({
-        where: { id },
-        data: updateData,
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            role: true,
-            updatedAt: true
-        }
+        where: { id: req.params.id },
+        data: { name, phone, role },
+        select: { id: true, email: true, name: true, role: true, phone: true }
     });
 
     res.status(200).json({
-        status: 'success',
-        success: true,
-        message: 'Профиль сотрудника обновлен',
-        data: updatedUser
+        status: "success",
+        data: { user: updatedUser }
     });
 });
 
 // ==========================================
-// 4. УДАЛЕНИЕ СОТРУДНИКА
+// 5. УДАЛИТЬ ПОЛЬЗОВАТЕЛЯ
 // ==========================================
 export const deleteUser = catchAsync(async (req, res, next) => {
-    const { id } = req.params;
+    const userToDelete = await prisma.user.findUnique({
+        where: { id: req.params.id }
+    });
 
-    const existingUser = await prisma.user.findUnique({ where: { id } });
-    if (!existingUser) {
-        return next(new AppError('Сотрудник не найден или уже удален', 404));
+    if (!userToDelete) {
+        return next(new AppError("Пользователь не найден", 404));
     }
 
-    // 🔥 Защита от случайного удаления главного администратора
-    if (existingUser.role === 'ADMIN') {
-        return next(new AppError('Удаление профиля администратора запрещено', 403));
+    // 🔥 SENIOR SECURITY CHECK: Абсолютная защита создателя
+    if (userToDelete.role === 'OWNER') {
+        return next(new AppError("Нельзя удалить OWNER. Это нарушит законы физики и сломает матрицу.", 403));
     }
 
-    await prisma.user.delete({ where: { id } });
+    // 🔥 SENIOR SECURITY CHECK: Только OWNER может удалять ADMIN-ов
+    if (userToDelete.role === 'ADMIN' && req.user.role !== 'OWNER') {
+        return next(new AppError("Только OWNER может увольнять администраторов.", 403));
+    }
 
-    res.status(200).json({
-        status: 'success',
-        success: true,
-        message: 'Доступ сотрудника успешно аннулирован'
+    await prisma.user.delete({
+        where: { id: req.params.id }
+    });
+
+    res.status(204).json({
+        status: "success",
+        data: null
     });
 });
