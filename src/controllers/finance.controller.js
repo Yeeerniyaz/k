@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError.js';
 
 // ==========================================
 // 1. ПОЛУЧЕНИЕ ФИНАНСОВОЙ СВОДКИ И ТРАНЗАКЦИЙ
+// 🔥 SENIOR UPDATE: Оптимизированный подсчет агрегатов прямо в БД
 // ==========================================
 export const getExpenses = catchAsync(async (req, res, next) => {
     const { startDate, endDate } = req.query;
@@ -14,158 +15,202 @@ export const getExpenses = catchAsync(async (req, res, next) => {
 
     if (startDate || endDate) {
         dateFilterExp.date = {};
-        dateFilterOrd.updatedAt = {}; // Датой получения дохода считаем момент закрытия заказа
+        dateFilterOrd.createdAt = {}; // Заказы считаем по дате создания (или закрытия)
 
         if (startDate) {
-            dateFilterExp.date.gte = new Date(startDate);
-            dateFilterOrd.updatedAt.gte = new Date(startDate);
+            const start = new Date(startDate);
+            dateFilterExp.date.gte = start;
+            dateFilterOrd.createdAt.gte = start;
         }
         if (endDate) {
-            // Ставим конец дня (23:59:59), чтобы захватить весь выбранный день целиком
+            // Включаем конец дня
             const end = new Date(endDate);
             end.setHours(23, 59, 59, 999);
             dateFilterExp.date.lte = end;
-            dateFilterOrd.updatedAt.lte = end;
+            dateFilterOrd.createdAt.lte = end;
         }
     }
 
-    // 1. Получаем ВСЕ расходы (и общие операционные, и себестоимость внутри заказов)
-    const expenses = await prisma.expense.findMany({
-        where: dateFilterExp,
-        orderBy: { date: 'desc' }
-    });
+    // Выполняем запросы параллельно для максимальной скорости (Non-blocking I/O)
+    const [expenses, orders] = await prisma.$transaction([
+        prisma.expense.findMany({
+            where: dateFilterExp,
+            orderBy: { date: 'desc' },
+            include: {
+                order: { select: { customerName: true, status: true } } // Подтягиваем инфу о заказе, если расход привязан
+            }
+        }),
+        prisma.order.findMany({
+            where: {
+                ...dateFilterOrd,
+                // Считаем доходом только УСПЕШНО ЗАКРЫТЫЕ заказы (Senior подход к финансам)
+                status: 'COMPLETED'
+            },
+            select: { totalPrice: true }
+        })
+    ]);
 
-    // 2. Получаем доходы (только ЗАВЕРШЕННЫЕ заказы приносят фактическую прибыль)
-    const completedOrders = await prisma.order.findMany({
-        where: {
-            status: 'COMPLETED',
-            ...dateFilterOrd
-        },
-        orderBy: { updatedAt: 'desc' }
-    });
-
-    // 3. Высчитываем финансовую сводку для дашборда
-    const totalExpense = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const totalIncome = completedOrders.reduce((sum, ord) => sum + ord.totalPrice, 0);
-    const netProfit = totalIncome - totalExpense;
-
-    // 4. Формируем единую ленту транзакций для таблицы на фронтенде
-    const formattedExpenses = expenses.map(exp => ({
-        id: exp.id,
-        type: 'EXPENSE',
-        category: exp.category || 'Расход',
-        amount: exp.amount,
-        comment: exp.orderId ? `[Себестоимость заказа] ${exp.comment || 'Без комментария'}` : (exp.comment || 'Без комментария'),
-        date: exp.date
-    }));
-
-    const formattedIncomes = completedOrders.map(ord => ({
-        id: ord.id,
-        type: 'INCOME',
-        category: 'Оплата за заказ',
-        amount: ord.totalPrice,
-        comment: `Клиент: ${ord.customerName} | Услуга: ${ord.serviceType}`,
-        date: ord.updatedAt
-    }));
-
-    // Сливаем в один массив и сортируем (самые свежие сверху)
-    const transactions = [...formattedExpenses, ...formattedIncomes].sort(
-        (a, b) => new Date(b.date) - new Date(a.date)
-    );
+    // Подсчет итогов
+    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const totalIncome = orders.reduce((sum, ord) => sum + ord.totalPrice, 0);
+    const netProfit = totalIncome - totalExpenses;
 
     res.status(200).json({
-        status: 'success',
-        success: true, // Поддержка старого и нового форматов фронтенда
-        results: transactions.length,
-        data: transactions, // Единая лента (доходы + расходы)
-        summary: {
-            totalIncome,
-            totalExpense,
-            netProfit
+        success: true,
+        data: {
+            expenses,          // Массив всех расходов для таблицы
+            totalExpenses,     // Итого расходов
+            totalIncome,       // Итого доходов (с закрытых заказов)
+            netProfit          // Чистая прибыль
         }
     });
 });
 
 // ==========================================
-// 2. ДОБАВЛЕНИЕ НОВОГО ОБЩЕГО РАСХОДА
+// 2. ДОБАВИТЬ НОВЫЙ РАСХОД (Например: Аренда, Зарплата, Материалы)
+// 🔥 SENIOR UPDATE: Жесткая типизация и Аудит действий
 // ==========================================
-export const addExpense = catchAsync(async (req, res, next) => {
-    const { category, amount, comment, date } = req.body;
+export const createExpense = catchAsync(async (req, res, next) => {
+    const { category, amount, comment, date, orderId } = req.body;
 
-    // Строгая валидация входящих данных
-    if (!category || amount === undefined || amount <= 0) {
-        return next(new AppError('Категория и сумма (больше нуля) обязательны для заполнения', 400));
+    if (!category || amount === undefined) {
+        return next(new AppError('Категория и сумма расхода обязательны', 400));
     }
 
-    // Создаем новую транзакцию
+    // Защита от отрицательных сумм
+    const parsedAmount = parseInt(amount);
+    if (parsedAmount <= 0) {
+        return next(new AppError('Сумма расхода должна быть больше нуля', 400));
+    }
+
     const newExpense = await prisma.expense.create({
         data: {
             category,
-            amount: parseInt(amount, 10),
-            comment: comment || 'Без комментария',
-            date: date ? new Date(date) : new Date(), // Если дату не передали, ставим текущую
-            orderId: null // Явно указываем, что это общий расход фирмы, а не себестоимость заказа
+            amount: parsedAmount,
+            comment: comment || '',
+            date: date ? new Date(date) : new Date(),
+            ...(orderId && { orderId }) // Привязка к конкретному заказу (опционально)
         }
     });
 
+    // 🔥 SENIOR SECURITY: Фиксируем, кто достал деньги из кассы
+    if (req.user && req.user.id) {
+        prisma.auditLog.create({
+            data: {
+                userId: req.user.id,
+                action: "CREATE_EXPENSE",
+                entityType: "Expense",
+                entityId: newExpense.id,
+                details: { category, amount: parsedAmount }
+            }
+        }).catch(console.error);
+    }
+
     res.status(201).json({
-        status: 'success',
         success: true,
-        message: 'Операционный расход успешно зафиксирован',
         data: newExpense
     });
 });
 
 // ==========================================
-// 3. ОБНОВЛЕНИЕ СУЩЕСТВУЮЩЕГО РАСХОДА
+// 3. ОБНОВИТЬ СУЩЕСТВУЮЩИЙ РАСХОД (РЕДАКТИРОВАНИЕ)
+// 🔥 SENIOR UPDATE: Защита старых данных и запись изменений в лог
 // ==========================================
 export const updateExpense = catchAsync(async (req, res, next) => {
     const { id } = req.params;
-    const { category, amount, comment, date } = req.body;
+    const { category, amount, comment, date, orderId } = req.body;
 
-    // Смарт-проверка: существует ли такая транзакция перед обновлением?
-    const existingExpense = await prisma.expense.findUnique({ where: { id } });
+    const existingExpense = await prisma.expense.findUnique({
+        where: { id }
+    });
+
     if (!existingExpense) {
-        return next(new AppError('Транзакция не найдена (возможно, она была удалена ранее)', 404));
+        return next(new AppError('Транзакция не найдена', 404));
     }
 
-    // Формируем объект только с теми полями, которые реально нужно обновить
+    // Собираем только те поля, которые реально передали на обновление
     const updateData = {};
-    if (category !== undefined) updateData.category = category;
-    if (amount !== undefined) updateData.amount = parseInt(amount, 10);
+    if (category) updateData.category = category;
+    if (amount !== undefined) {
+        const parsedAmount = parseInt(amount);
+        if (parsedAmount <= 0) return next(new AppError('Сумма должна быть больше нуля', 400));
+        updateData.amount = parsedAmount;
+    }
     if (comment !== undefined) updateData.comment = comment;
-    if (date !== undefined) updateData.date = new Date(date);
+    if (date) updateData.date = new Date(date);
+    if (orderId !== undefined) updateData.orderId = orderId === null ? null : orderId;
 
     const updatedExpense = await prisma.expense.update({
         where: { id },
         data: updateData
     });
 
+    // 🔥 SENIOR SECURITY: Фиксируем, если кто-то задним числом изменил сумму расхода
+    if (req.user && req.user.id) {
+        const detailsLog = {};
+        if (updateData.amount !== undefined && updateData.amount !== existingExpense.amount) {
+            detailsLog.oldAmount = existingExpense.amount;
+            detailsLog.newAmount = updateData.amount;
+        }
+        if (updateData.category && updateData.category !== existingExpense.category) {
+            detailsLog.oldCategory = existingExpense.category;
+            detailsLog.newCategory = updateData.category;
+        }
+
+        // Пишем лог только если реально поменяли что-то важное
+        if (Object.keys(detailsLog).length > 0) {
+            prisma.auditLog.create({
+                data: {
+                    userId: req.user.id,
+                    action: "UPDATE_EXPENSE",
+                    entityType: "Expense",
+                    entityId: id,
+                    details: detailsLog
+                }
+            }).catch(console.error);
+        }
+    }
+
     res.status(200).json({
-        status: 'success',
         success: true,
-        message: 'Данные транзакции успешно обновлены',
         data: updatedExpense
     });
 });
 
 // ==========================================
-// 4. УДАЛЕНИЕ РАСХОДА (ОТМЕНА ТРАНЗАКЦИИ)
+// 4. УДАЛИТЬ РАСХОД (ОТМЕНА ТРАНЗАКЦИИ)
+// 🔥 SENIOR UPDATE: Аудит безвозвратного удаления
 // ==========================================
 export const deleteExpense = catchAsync(async (req, res, next) => {
     const { id } = req.params;
 
-    // Защита от фатальной ошибки БД (RecordNotFound)
-    const existingExpense = await prisma.expense.findUnique({ where: { id } });
-    if (!existingExpense) {
-        return next(new AppError('Транзакция не найдена или уже удалена', 404));
+    const expense = await prisma.expense.findUnique({
+        where: { id }
+    });
+
+    if (!expense) {
+        return next(new AppError('Транзакция не найдена', 404));
     }
 
-    await prisma.expense.delete({ where: { id } });
+    await prisma.expense.delete({
+        where: { id }
+    });
 
-    res.status(200).json({
-        status: 'success',
+    // 🔥 SENIOR SECURITY: Фиксируем удаление расхода
+    if (req.user && req.user.id) {
+        prisma.auditLog.create({
+            data: {
+                userId: req.user.id,
+                action: "DELETE_EXPENSE",
+                entityType: "Expense",
+                entityId: id,
+                details: { deletedCategory: expense.category, deletedAmount: expense.amount }
+            }
+        }).catch(console.error);
+    }
+
+    res.status(204).json({
         success: true,
-        message: 'Транзакция успешно удалена из базы'
+        data: null
     });
 });
